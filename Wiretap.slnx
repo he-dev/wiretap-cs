@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Wiretap.Api/Wiretap.Api.csproj" />
+  <Project Path="Wiretap.Test/Wiretap.Test.csproj" />
+  <Project Path="Wiretap/Wiretap.csproj" />
+</Solution>
