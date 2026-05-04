@@ -11,23 +11,9 @@
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
     </PropertyGroup>
     <ItemGroup>
-        <EmbeddedResource Include="res\Flexo\ExpressionCollection.json" />
-        <EmbeddedResource Include="res\Flexo\ExpressionUseCases.json" />
-        <EmbeddedResource Include="res\Flexo\Packages.IsPositive.json" />
-        <EmbeddedResource Include="res\Utilities\JsonNet\PrettyType0.json" />
-        <EmbeddedResource Include="res\Utilities\JsonNet\PrettyType1.json" />
-        <EmbeddedResource Include="res\Utilities\JsonNet\PrettyType2.json" />
-        <EmbeddedResource Include="sql\Translucent\Config\seed-test-data.sql" />
         <None Remove="res\IOnymous\test.txt" />
-        <EmbeddedResource Include="res\Flexo\ExpressionObject.json" />
-        <EmbeddedResource Include="res\octopus\Http\Mailr\HtmlTable.json" />
-        <EmbeddedResource Include="res\octopus\test.txt" />
         <None Remove="sql\SmartConfig\seed-test-data.sql" />
-        <None Update="hosting.json">
-          <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Remove="res\Beaver\Features.json" />
-        <EmbeddedResource Include="res\Beaver\Features.json" />
         <EmbeddedResource Remove="src\Flawless\**" />
         <None Remove="src\Flawless\**" />
         <EmbeddedResource Remove="src\Flexo\**" />
@@ -143,17 +129,6 @@
         <Compile Remove="src\Octopus\Controllers\file\PhysicalFileControllerTest.cs" />
         <Compile Remove="src\Octopus\Nodes\ProcessRequestTest.cs" />
 <!--        <Compile Remove="src\Commander\**" />-->
-    </ItemGroup>
-    <ItemGroup>
-      <Folder Include="src\Beaver" />
-      <Folder Include="src\Deception" />
-      <Folder Include="src\Fluorite" />
-      <Folder Include="src\Octopus\config" />
-      <Folder Include="src\Octopus\Controllers\config" />
-      <Folder Include="src\Octopus\Controllers\http" />
-      <Folder Include="src\Teapot" />
-      <Folder Include="src\Utilities\Mailr\Models" />
-      <Folder Include="src\Wiretap" />
     </ItemGroup>
     
 </Project>

@@ -3,57 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29102.190
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wiretap", "Wiretap\Wiretap.csproj", "{6C0AB70F-1BCB-488C-B905-6681A3BF152F}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wiretap.Loggers.NLog", "Wiretap.Loggers.NLog\Wiretap.Loggers.NLog.csproj", "{2E315F60-6572-4E5E-866D-475D6A990CD5}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wiretap.Console", "Wiretap.Console\Wiretap.Console.csproj", "{BA4F622C-AB9B-4C1C-9CBE-02490532D037}"
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wiretap.AspNetCore", "Wiretap.AspNetCore\Wiretap.AspNetCore.csproj", "{645BDDA4-873B-4B20-9696-B442E85BD270}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{167E65EE-1F13-437D-9BDD-72B00874BA67}"
-	ProjectSection(SolutionItems) = preProject
-		tests.runsettings = tests.runsettings
-	EndProjectSection
-EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Wiretap.Tests", "Wiretap.Tests\Wiretap.Tests.csproj", "{3FA08226-408C-4347-BBD8-7D505C8D48DE}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{48A22318-5B03-4E3B-91C9-12E3769A0FA9}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "main", "main", "{82D01D3E-754E-4F60-8629-34D43FEC506D}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6C0AB70F-1BCB-488C-B905-6681A3BF152F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6C0AB70F-1BCB-488C-B905-6681A3BF152F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6C0AB70F-1BCB-488C-B905-6681A3BF152F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6C0AB70F-1BCB-488C-B905-6681A3BF152F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2E315F60-6572-4E5E-866D-475D6A990CD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2E315F60-6572-4E5E-866D-475D6A990CD5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2E315F60-6572-4E5E-866D-475D6A990CD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2E315F60-6572-4E5E-866D-475D6A990CD5}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BA4F622C-AB9B-4C1C-9CBE-02490532D037}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BA4F622C-AB9B-4C1C-9CBE-02490532D037}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BA4F622C-AB9B-4C1C-9CBE-02490532D037}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{645BDDA4-873B-4B20-9696-B442E85BD270}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{645BDDA4-873B-4B20-9696-B442E85BD270}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{645BDDA4-873B-4B20-9696-B442E85BD270}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3FA08226-408C-4347-BBD8-7D505C8D48DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3FA08226-408C-4347-BBD8-7D505C8D48DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{6C0AB70F-1BCB-488C-B905-6681A3BF152F} = {82D01D3E-754E-4F60-8629-34D43FEC506D}
-		{645BDDA4-873B-4B20-9696-B442E85BD270} = {82D01D3E-754E-4F60-8629-34D43FEC506D}
-		{2E315F60-6572-4E5E-866D-475D6A990CD5} = {82D01D3E-754E-4F60-8629-34D43FEC506D}
-		{3FA08226-408C-4347-BBD8-7D505C8D48DE} = {48A22318-5B03-4E3B-91C9-12E3769A0FA9}
-		{BA4F622C-AB9B-4C1C-9CBE-02490532D037} = {48A22318-5B03-4E3B-91C9-12E3769A0FA9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {2FA54731-890C-4550-BACA-E19B564CE1E3}
