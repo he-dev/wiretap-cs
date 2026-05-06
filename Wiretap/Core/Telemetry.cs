@@ -1,33 +1,30 @@
 ﻿using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Reflection;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using DiagnosticActivity = System.Diagnostics.Activity;
 
 namespace Wiretap.Core;
 
-public static class Telemetry
+public abstract class Channel
 {
-    public abstract class Channel
-    {
-        // core: Logs about what the system is supposed to produce.
-        public abstract class Output : Channel;
+    // core: Logs about what the system is supposed to produce.
+    public abstract class Output : Channel;
 
-        // core: Logs about what allows the system able to produce.
-        public abstract class Engine : Channel;
-    }
+    // core: Logs about what allows the system able to produce.
+    public abstract class Engine : Channel;
+}
 
-    public abstract class Stream
-    {
-        // core: Pure telemetry data.
-        public abstract class Data;
+public abstract class Stream
+{
+    // core: Pure telemetry data.
+    public abstract class Data;
 
-        // core: Something nice to know about what is going on.
-        public abstract class Note;
+    // core: Something nice to know about what is going on.
+    public abstract class Note;
 
-        // core: Readable entries meant for the console.
-        public abstract class Text;
-    }
+    // core: Readable entries meant for the console.
+    public abstract class Text;
 }
 
 [AttributeUsage(AttributeTargets.Class)]
@@ -54,11 +51,6 @@ public class ChannelAttribute(string? name = null) : Attribute
     public string? Name { get; } = name;
 }
 
-public interface IWithStateItems
-{
-    public IEnumerable<KeyValuePair<string, object>> EnumerateStateItems();
-}
-
 public static class Find<TAttribute> where TAttribute : Attribute
 {
     public static AttributeMatch<TAttribute>? From<TActivity>() => From(typeof(TActivity));
@@ -80,13 +72,19 @@ public static class Find<TAttribute> where TAttribute : Attribute
             }
         }
 
-        //throw new InvalidOperationException($"The '{typeof(TAttribute).Name}' was not found on any of the checked types [{string.Join(", ", visited.Select(t => t.Name))}].");
-
         return null;
+    }
+
+    public static class Required
+    {
+        public static AttributeMatch<TAttribute> From(Type type)
+        {
+            return Find<TAttribute>.From(type) ?? throw new InvalidOperationException($"The '{typeof(TAttribute).Name}' attribute was not found on '{type.FullName}' or any of its declaring types.");
+        }
     }
 }
 
-public sealed record AttributeMatch<TAttribute>(TAttribute Attribute, IReadOnlyList<Type> Visited, IReadOnlyList<Type> Path)
+public sealed record AttributeMatch<TAttribute>(TAttribute Attribute, IReadOnlyList<Type> Visited, IReadOnlyList<Type> Path) where TAttribute : Attribute
 {
     public int Depth => Visited.Count;
 }
@@ -153,14 +151,14 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ILogger<TChannel> Channel<TChannel>() => logger.MapAs<T, TChannel>().WithState((nameof(Telemetry.Channel), typeof(TChannel).Name));
+        public ILogger<TChannel> Channel<TChannel>() => logger.MapAs<T, TChannel>().WithState((nameof(Channel), typeof(TChannel).Name));
 
-        public ILogger<Telemetry.Channel.Output> Output => logger.Channel<T, Telemetry.Channel.Output>();
-        public ILogger<Telemetry.Channel.Engine> Engine => logger.Channel<T, Telemetry.Channel.Engine>();
+        public ILogger<Channel.Output> Output => logger.Channel<T, Channel.Output>();
+        public ILogger<Channel.Engine> Engine => logger.Channel<T, Channel.Engine>();
 
-        public ILogger<Telemetry.Stream.Data> Data => logger.MapAs<T, Telemetry.Stream.Data>().WithState((nameof(Telemetry.Stream), nameof(Telemetry.Stream.Data)));
-        public ILogger<Telemetry.Stream.Note> Note => logger.MapAs<T, Telemetry.Stream.Note>().WithState((nameof(Telemetry.Stream), nameof(Telemetry.Stream.Note)));
-        public ILogger<Telemetry.Stream.Text> Text => logger.MapAs<T, Telemetry.Stream.Text>().WithState((nameof(Telemetry.Stream), nameof(Telemetry.Stream.Text)));
+        public ILogger<Stream.Data> Data => logger.MapAs<T, Stream.Data>().WithState((nameof(Stream), nameof(Stream.Data)));
+        public ILogger<Stream.Note> Note => logger.MapAs<T, Stream.Note>().WithState((nameof(Stream), nameof(Stream.Note)));
+        public ILogger<Stream.Text> Text => logger.MapAs<T, Stream.Text>().WithState((nameof(Stream), nameof(Stream.Text)));
 
         public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
         {
@@ -169,61 +167,74 @@ public static class LoggerExtensions
     }
 }
 
+public static class DictionaryExtensions
+{
+    extension(IDictionary<string, object> state)
+    {
+        public void MergeStateFrom<T>(T source)
+        {
+            if (source is not IEnumerableState enumerableState)
+            {
+                return;
+            }
+
+            foreach (var (key, value) in enumerableState.EnumerateState())
+            {
+                if (state.TryGetValue(key, out var currentValue))
+                {
+                    throw new InvalidOperationException($"The type '{typeof(T).FullName}' tries to add the key '{key}' with value '{value}', but it already exists with value '{currentValue}'.");
+                }
+
+                state.Add(key, value);
+            }
+        }
+    }
+}
+
 // core: This class may not be a logger, because it will circumvent the LogStatus constraints for statuses allowing to apply IStatusOnly to an IStatusWithDuration scope!
 public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : Activity
 {
+    // todo: set tags like "wiretap.activity" or "wiretap.channel"
+    private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
+
+    private Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
+
+    // util: Track all status for debugging. It is for free.
     private Stack<ActivityStatus<TActivity>> StatusHistory { get; } = new();
 
-    private DiagnosticActivity _Activity { get; } = new DiagnosticActivity(activity.Name).Start();
+    private bool ContainsLast => StatusHistory.OfType<ILastStatus>().Any();
 
     public ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
     {
-        Stop(status);
-
-        if (StatusHistory.Any(s => s.IsLast))
+        if (status is ActivityStatus<TActivity>.LastStatus lastStatus && ContainsLast)
         {
+            ActivityWrapper.Stop(isOk: status switch
+            {
+                ActivityStatus<TActivity>.Ok => true,
+                ActivityStatus<TActivity>.Error => false,
+                _ => null
+            });
+
             if (activity.OnStopWithLastStatus?.Attribute is OnLogStatusWithLast.LogOverflow)
             {
-                // todo: Log which status overflowed.
-                new ActivityStatus<TActivity>.Overflow().Log(logger, activity, _Activity.Duration);
+                lastStatus.Overflow = true;
             }
             else
             {
                 throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
             }
         }
-        else
-        {
-            status.Log(logger, activity, _Activity.Duration);
-        }
+
+        status.Log(logger, activity, Stopwatch.Elapsed);
 
         StatusHistory.Push(status);
         return this;
     }
 
-    private void Stop(ActivityStatus<TActivity> status)
-    {
-        if (_Activity.IsStopped || !status.IsLast)
-        {
-            return;
-        }
-
-        var statusCode = status switch
-        {
-            ActivityStatus<TActivity>.Ok => System.Diagnostics.ActivityStatusCode.Ok,
-            ActivityStatus<TActivity>.Error => System.Diagnostics.ActivityStatusCode.Error,
-            // core: Inconclusive and Halt are terminal, but their status is unknown.
-            _ => System.Diagnostics.ActivityStatusCode.Unset
-        };
-
-        _Activity.Stop();
-        _Activity.SetStatus(statusCode);
-    }
-
     public void Dispose()
     {
         // note: There is no last status!
-        if (!StatusHistory.Any(s => s.IsLast))
+        if (!StatusHistory.OfType<ILastStatus>().Any())
         {
             switch (activity.OnDisposeWithoutLastStatus?.Attribute)
             {
@@ -238,7 +249,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             }
         }
 
-        _Activity.Dispose();
+        ActivityWrapper.Dispose();
     }
 
     public static ActivityScope<TActivity> Start<T>(ILogger<T> logger, TActivity activity)
@@ -247,20 +258,71 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
     }
 }
 
+internal sealed class ActivityWrapper(string name) : IDisposable
+{
+    private static readonly ActivitySource Source = new(nameof(Wiretap));
+
+    private System.Diagnostics.Activity? Native { get; } = Source.StartActivity(name);
+
+    public void Stop(bool? isOk)
+    {
+        if (Native is { IsStopped: false })
+        {
+            var statusCode = isOk switch
+            {
+                true => System.Diagnostics.ActivityStatusCode.Ok,
+                false => System.Diagnostics.ActivityStatusCode.Error,
+                _ => System.Diagnostics.ActivityStatusCode.Unset
+            };
+
+            Native
+                .SetStatus(statusCode)
+                .Stop();
+        }
+    }
+
+    public void Dispose() => Native?.Dispose();
+}
+
 // meta: This class is required to make the message template work with structured logging as the attribute can only be used on parameters.
-public record StatusTemplate([StructuredMessageTemplate] string? Message, params object?[] Args);
+public record MessageTemplate([StructuredMessageTemplate] string? Template, params object?[] Args)
+{
+    // todo: required?
+    public LogLevel Level { get; init; }
+
+    public Exception? Exception { get; init; }
+
+    public void Log(ILogger logger)
+    {
+        if (Level == LogLevel.None)
+        {
+            throw new InvalidOperationException("Message templates without log-level cannot be logged.");
+        }
+
+        logger.Log(Level, Exception, Template, Args);
+    }
+
+    public static MessageTemplate operator +(MessageTemplate left, MessageTemplate right)
+    {
+        if (left.Exception is not null && right.Exception is not null)
+        {
+            throw new InvalidOperationException("The message templates cannot contain both exceptions.");
+        }
+
+        return new($"{left.Template}; {right.Template}", [..left.Args, ..right.Args])
+        {
+            Level = left.Level > right.Level ? left.Level : right.Level,
+            Exception = left.Exception ?? right.Exception
+        };
+    }
+}
 
 public abstract class Activity
 {
     protected Activity()
     {
-        ChannelMatch = Find<ChannelAttribute>.From(GetType()) ?? throw new InvalidOperationException
-        (
-            $"The activity '{GetType().FullName}' has no channel. One of its declaring types must derive from '{nameof(Channel)}'."
-        );
-
+        ChannelMatch = Find<ChannelAttribute>.Required.From(GetType());
         OnStopWithLastStatus = Find<OnLogStatusWithLast>.From(GetType());
-
         OnDisposeWithoutLastStatus = Find<OnDisposeWithoutLastStatus>.From(GetType());
     }
 
@@ -276,140 +338,163 @@ public abstract class Activity
     public string Name => string.Join(".", ChannelMatch.Path.Skip(1).Select(t => t.Name));
 }
 
-public abstract class ActivityStatus<TActivity>(bool isLast) where TActivity : Activity
+public interface ILastStatus
+{
+    bool Overflow { get; }
+}
+
+public interface IEnumerableState
+{
+    IEnumerable<(string Key, object Value)> EnumerateState();
+}
+
+public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivity : Activity
 {
     protected virtual string Code => GetType().Name;
 
-    public bool IsLast => isLast;
-
     // core: Let inheritors provide their own template.
-    protected virtual StatusTemplate Render(TActivity activity, TimeSpan duration)
+    protected virtual MessageTemplate Render(TActivity activity, TimeSpan duration)
     {
-        return new("{Activity}: {Status} in {DurationMs:N0} ms", activity.Name, Code, duration.TotalMilliseconds);
+        var template = new MessageTemplate("{Activity}: {Status}", activity.Name, Code);
+
+        if (duration > TimeSpan.Zero)
+        {
+            if (this is ILastStatus { Overflow: false })
+            {
+                template += new MessageTemplate("Duration: {DurationMs:N0} ms", duration.TotalMilliseconds);
+            }
+            else
+            {
+                template += new MessageTemplate("Elapsed: {ElapsedMs:N0} ms", duration.TotalMilliseconds);
+            }
+        }
+
+        return template;
     }
 
-    // core: Each status needs to provide its own logging.
-    protected abstract void Log(ILogger logger, StatusTemplate template);
+    public virtual IEnumerable<(string, object)> EnumerateState()
+    {
+        yield break;
+    }
 
     public void Log(ILogger logger, TActivity activity, TimeSpan duration)
     {
         var state = new Dictionary<string, object>
         {
             { nameof(Activity), activity.Name },
-            { nameof(Telemetry.Channel), activity.Channel },
-            { nameof(Telemetry.Stream), nameof(Telemetry.Stream.Data) }
+            { nameof(Channel), activity.Channel },
+            { nameof(Stream), nameof(Stream.Data) }
         };
 
-        MergeStateItems(activity, state);
-        MergeStateItems(this, state);
+        state.MergeStateFrom(this);
+        state.MergeStateFrom(activity);
 
         using (logger.BeginScope(state))
         {
-            Log(logger, Render(activity, duration));
+            Render(activity, duration).Log(logger);
         }
     }
 
-    private static void MergeStateItems<T>(T source, IDictionary<string, object> state)
+    public class First : ActivityStatus<TActivity>
     {
-        if (source is IWithStateItems customState)
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
         {
-            var any = false;
-
-            // core: Adding the custom state items to the scope.
-            foreach (var (key, value) in customState.EnumerateStateItems())
-            {
-                if (state.TryGetValue(key, out var currentValue))
-                {
-                    throw new InvalidOperationException($"The type '{typeof(T).FullName}' tries to add the key '{key}' with value '{value}', but it already exists with value '{currentValue}'.");
-                }
-
-                state.Add(key, value);
-                any = true;
-            }
-
-            if (!any)
-            {
-                throw new InvalidOperationException($"The type '{typeof(T).FullName}' implements the '{nameof(IWithStateItems)}' interface but returns zero items.");
-            }
+            return base.Render(activity, duration) with { Level = LogLevel.Trace };
         }
     }
 
-    // core: First status always logs at trace level.
-    public class First() : ActivityStatus<TActivity>(isLast: false)
+    public abstract class LastStatus : ActivityStatus<TActivity>, ILastStatus
     {
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogTrace(template.Message, template.Args);
+        public bool Overflow { get; internal set; }
+
+        protected override string Code => Overflow ? nameof(Overflow) : base.Code;
+
+        public override IEnumerable<(string, object)> EnumerateState()
+        {
+            if (Overflow)
+            {
+                // core: Returns the original code for reference.
+                yield return new(nameof(Overflow), base.Code);
+            }
+        }
     }
 
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-    public abstract class Halt(string reason) : ActivityStatus<TActivity>(isLast: true), IWithStateItems
+    public abstract class Halt : LastStatus
     {
-        public IEnumerable<KeyValuePair<string, object>> EnumerateStateItems()
-        {
-            yield return new(nameof(reason), reason);
-        }
+        public required string Reason { get; init; }
 
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogWarning(template.Message, template.Args);
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            return base.Render(activity, duration) with { Level = LogLevel.Warning } + new MessageTemplate("Reason: {Reason}", Reason);
+        }
     }
 
     // core: This status applies when the caller does not care about the result.
-    public class Void() : ActivityStatus<TActivity>(isLast: true)
+    public class Void : LastStatus
     {
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogInformation(template.Message, template.Args);
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            return base.Render(activity, duration) with { Level = LogLevel.Information };
+        }
     }
 
     // core: This status applies when everything went according to plan.
-    public abstract class Ok() : ActivityStatus<TActivity>(isLast: true)
+    public abstract class Ok : LastStatus
     {
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogInformation(template.Message, template.Args);
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            return base.Render(activity, duration) with { Level = LogLevel.Information };
+        }
     }
 
     // core: This status applies when an error occured.
-    public abstract class Error() : ActivityStatus<TActivity>(isLast: true)
+    public abstract class Error : LastStatus
     {
         public Exception? Exception { get; init; }
 
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogError(Exception, template.Message, template.Args);
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            return base.Render(activity, duration) with { Level = LogLevel.Error, Exception = Exception };
+        }
     }
 
     // core: This status applies when activity was not properly stopped.
-    public class Missing() : ActivityStatus<TActivity>(isLast: true)
+    public class Missing : LastStatus
     {
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogWarning(template.Message, template.Args);
-    }
-
-    // code: This status applies when the same status was logged multiple times: Ok -> Ok.
-    public class Overflow() : ActivityStatus<TActivity>(isLast: false)
-    {
-        protected override void Log(ILogger logger, StatusTemplate template) => logger.LogWarning(template.Message, template.Args);
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            return base.Render(activity, duration) with { Level = LogLevel.Warning };
+        }
     }
 }
 
 [Channel]
-public abstract class Output : Telemetry.Channel.Output
+public abstract class Output : Channel.Output
 {
     public abstract class Workflow
     {
         [OnDisposeWithoutLastStatus.LogMissing]
         public class ExecuteStep : Activity
         {
-            public class Now : ExecuteStep, IWithStateItems
+            public class Now : ExecuteStep, IEnumerableState
             {
                 public required int StepIndex { get; init; }
 
-                public IEnumerable<KeyValuePair<string, object>> EnumerateStateItems()
+                public IEnumerable<(string, object)> EnumerateState()
                 {
                     yield return new(nameof(StepIndex), StepIndex);
                 }
 
-                public sealed class Ok : ActivityStatus<Now>.Ok, IWithStateItems
+                public sealed class Ok : ActivityStatus<Now>.Ok
                 {
                     // note: Can be either a property or a constructor parameter. Does not really make any difference.
                     public required int ItemsProcessed { get; init; }
 
-                    public IEnumerable<KeyValuePair<string, object>> EnumerateStateItems()
+                    public override IEnumerable<(string, object)> EnumerateState()
                     {
-                        yield return new(nameof(ItemsProcessed), ItemsProcessed);
+                        return base.EnumerateState().Append((nameof(ItemsProcessed), ItemsProcessed));
                     }
                 }
 
@@ -420,20 +505,20 @@ public abstract class Output : Telemetry.Channel.Output
 }
 
 [Channel]
-public abstract class Engine : Telemetry.Channel.Engine
+public abstract class Engine : Channel.Engine
 {
     [OnDisposeWithoutLastStatus.LogVoid]
     [OnLogStatusWithLast.LogOverflow]
-    public class DeleteFile : Activity, IWithStateItems
+    public class DeleteFile : Activity, IEnumerableState
     {
         public required string Path { get; init; }
 
-        public IEnumerable<KeyValuePair<string, object>> EnumerateStateItems()
+        public IEnumerable<(string Key, object Value)> EnumerateState()
         {
             yield return new(nameof(Path), Path);
         }
 
-        public sealed class Halt(string reason) : ActivityStatus<DeleteFile>.Halt(reason);
+        public sealed class Halt : ActivityStatus<DeleteFile>.Halt;
 
         public sealed class Ok : ActivityStatus<DeleteFile>.Ok;
 

@@ -54,7 +54,7 @@ using (var scope = app.Services.CreateScope())
 
     using (var delete = logger.Begin(new Engine.DeleteFile { Path = "test.txt" }))
     {
-        delete.LogStatus(new Engine.DeleteFile.Halt("File not found."));
+        delete.LogStatus(new Engine.DeleteFile.Halt { Reason = "File not found." });
         delete.LogStatus(new Engine.DeleteFile.Error());
         delete.LogStatus(new Engine.DeleteFile.Ok());
     }
