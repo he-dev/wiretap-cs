@@ -28,22 +28,11 @@ public abstract class Stream
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public abstract class OnLogStatusWithLast : Attribute
-{
-    public sealed class LogOverflow : OnLogStatusWithLast;
+public class LastStatusOverflowThrows : Attribute;
 
-    public sealed class Default : OnLogStatusWithLast;
-}
-
+// todo: this needs a better name.
 [AttributeUsage(AttributeTargets.Class)]
-public abstract class OnDisposeWithoutLastStatus : Attribute
-{
-    public sealed class LogVoid : OnDisposeWithoutLastStatus;
-
-    public sealed class LogMissing : OnDisposeWithoutLastStatus;
-
-    public sealed class Default : OnDisposeWithoutLastStatus;
-}
+public class LastStatusIsVoid : Attribute;
 
 [AttributeUsage(AttributeTargets.Class)]
 public class ChannelAttribute(string? name = null) : Attribute
@@ -53,9 +42,9 @@ public class ChannelAttribute(string? name = null) : Attribute
 
 public static class Find<TAttribute> where TAttribute : Attribute
 {
-    public static AttributeMatch<TAttribute>? From<TActivity>() => From(typeof(TActivity));
+    public static AttributeMatch<TAttribute> From<TActivity>() => From(typeof(TActivity));
 
-    public static AttributeMatch<TAttribute>? From(Type type)
+    public static AttributeMatch<TAttribute> From(Type type)
     {
         var path = new Stack<Type>();
         var visited = new List<Type>();
@@ -72,19 +61,11 @@ public static class Find<TAttribute> where TAttribute : Attribute
             }
         }
 
-        return null;
-    }
-
-    public static class Required
-    {
-        public static AttributeMatch<TAttribute> From(Type type)
-        {
-            return Find<TAttribute>.From(type) ?? throw new InvalidOperationException($"The '{typeof(TAttribute).Name}' attribute was not found on '{type.FullName}' or any of its declaring types.");
-        }
+        return new(null, visited.ToArray(), path.ToArray());
     }
 }
 
-public sealed record AttributeMatch<TAttribute>(TAttribute Attribute, IReadOnlyList<Type> Visited, IReadOnlyList<Type> Path) where TAttribute : Attribute
+public sealed record AttributeMatch<TAttribute>(TAttribute? Attribute, IReadOnlyList<Type> Visited, IReadOnlyList<Type> Path) where TAttribute : Attribute
 {
     public int Depth => Visited.Count;
 }
@@ -206,24 +187,37 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 
     public ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
     {
-        if (status is ActivityStatus<TActivity>.LastStatus lastStatus && ContainsLast)
+        if (status is ILastStatus)
         {
+            if (status is not IAutoStatus)
+            {
+                if (activity.LastStatusIsVoid)
+                {
+                    throw new InvalidOperationException(
+                        $"The code is trying to log the '{status.Code}' last status for the '{activity.Name}' activity, " +
+                        $"but activities with the '{nameof(LastStatusIsVoid)}' attribute can't have an explicit last status.");
+                }
+
+                // core: If the last status is already logged...
+                if (ContainsLast)
+                {
+                    if (activity.LastStatusOverflowThrows)
+                    {
+                        throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
+                    }
+
+                    status = new ActivityStatus<TActivity>.Overflow(status);
+                }
+            }
+
             ActivityWrapper.Stop(isOk: status switch
             {
                 ActivityStatus<TActivity>.Ok => true,
                 ActivityStatus<TActivity>.Error => false,
                 _ => null
             });
-
-            if (activity.OnStopWithLastStatus?.Attribute is OnLogStatusWithLast.LogOverflow)
-            {
-                lastStatus.Overflow = true;
-            }
-            else
-            {
-                throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
-            }
         }
+
 
         status.Log(logger, activity, Stopwatch.Elapsed);
 
@@ -236,16 +230,14 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
         // note: There is no last status!
         if (!StatusHistory.OfType<ILastStatus>().Any())
         {
-            switch (activity.OnDisposeWithoutLastStatus?.Attribute)
+            switch (activity.LastStatusIsVoid)
             {
-                case OnDisposeWithoutLastStatus.LogMissing:
-                    LogStatus(new ActivityStatus<TActivity>.Missing());
-                    break;
-                case OnDisposeWithoutLastStatus.LogVoid:
+                case true:
                     LogStatus(new ActivityStatus<TActivity>.Void());
                     break;
-                default:
-                    throw new InvalidOperationException($"The activity '{activity.Name}' requires a last status but it was never logged.");
+                case false:
+                    LogStatus(new ActivityStatus<TActivity>.Missing());
+                    break;
             }
         }
 
@@ -321,27 +313,30 @@ public abstract class Activity
 {
     protected Activity()
     {
-        ChannelMatch = Find<ChannelAttribute>.Required.From(GetType());
-        OnStopWithLastStatus = Find<OnLogStatusWithLast>.From(GetType());
-        OnDisposeWithoutLastStatus = Find<OnDisposeWithoutLastStatus>.From(GetType());
+        var channelMatch = Find<ChannelAttribute>.From(GetType());
+        Channel = channelMatch.Path.First().Name;
+
+        // note: The activity name begins after the channel, so skip it.
+        Name = string.Join(".", channelMatch.Path.Skip(1).Select(t => t.Name));
+
+        LastStatusIsVoid = Find<LastStatusIsVoid>.From(GetType()).Attribute is not null;
+        LastStatusOverflowThrows = Find<LastStatusOverflowThrows>.From(GetType()).Attribute is not null;
     }
 
-    private AttributeMatch<ChannelAttribute> ChannelMatch { get; }
+    public bool LastStatusIsVoid { get; }
 
-    public AttributeMatch<OnLogStatusWithLast>? OnStopWithLastStatus { get; }
+    public bool LastStatusOverflowThrows { get; }
 
-    public AttributeMatch<OnDisposeWithoutLastStatus>? OnDisposeWithoutLastStatus { get; }
+    public string Channel { get; }
 
-    public string Channel => ChannelMatch.Attribute.Name ?? ChannelMatch.Path.First().Name;
-
-    // note: The activity name begins after the channel, so skip it.
-    public string Name => string.Join(".", ChannelMatch.Path.Skip(1).Select(t => t.Name));
+    public string Name { get; }
 }
 
-public interface ILastStatus
-{
-    bool Overflow { get; }
-}
+public interface IMiddleStatus;
+
+public interface ILastStatus;
+
+internal interface IAutoStatus;
 
 public interface IEnumerableState
 {
@@ -350,7 +345,7 @@ public interface IEnumerableState
 
 public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivity : Activity
 {
-    protected virtual string Code => GetType().Name;
+    internal virtual string Code => GetType().Name;
 
     // core: Let inheritors provide their own template.
     protected virtual MessageTemplate Render(TActivity activity, TimeSpan duration)
@@ -359,13 +354,13 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
 
         if (duration > TimeSpan.Zero)
         {
-            if (this is ILastStatus { Overflow: false })
+            if (this is Overflow)
             {
-                template += new MessageTemplate("Duration: {DurationMs:N0} ms", duration.TotalMilliseconds);
+                template += new MessageTemplate("Elapsed: {ElapsedMs:N0} ms", duration.TotalMilliseconds);
             }
             else
             {
-                template += new MessageTemplate("Elapsed: {ElapsedMs:N0} ms", duration.TotalMilliseconds);
+                template += new MessageTemplate("Duration: {DurationMs:N0} ms", duration.TotalMilliseconds);
             }
         }
 
@@ -403,25 +398,9 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
         }
     }
 
-    public abstract class LastStatus : ActivityStatus<TActivity>, ILastStatus
-    {
-        public bool Overflow { get; internal set; }
-
-        protected override string Code => Overflow ? nameof(Overflow) : base.Code;
-
-        public override IEnumerable<(string, object)> EnumerateState()
-        {
-            if (Overflow)
-            {
-                // core: Returns the original code for reference.
-                yield return new(nameof(Overflow), base.Code);
-            }
-        }
-    }
-
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-    public abstract class Halt : LastStatus
+    public abstract class Halt : ActivityStatus<TActivity>, ILastStatus
     {
         public required string Reason { get; init; }
 
@@ -432,7 +411,7 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
     }
 
     // core: This status applies when the caller does not care about the result.
-    public class Void : LastStatus
+    internal class Void : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
     {
         protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
         {
@@ -441,7 +420,7 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
     }
 
     // core: This status applies when everything went according to plan.
-    public abstract class Ok : LastStatus
+    public abstract class Ok : ActivityStatus<TActivity>, ILastStatus
     {
         protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
         {
@@ -450,7 +429,7 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
     }
 
     // core: This status applies when an error occured.
-    public abstract class Error : LastStatus
+    public abstract class Error : ActivityStatus<TActivity>, ILastStatus
     {
         public Exception? Exception { get; init; }
 
@@ -461,21 +440,44 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
     }
 
     // core: This status applies when activity was not properly stopped.
-    public class Missing : LastStatus
+    internal class Missing : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
     {
         protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
         {
             return base.Render(activity, duration) with { Level = LogLevel.Warning };
         }
     }
+
+    internal sealed class Overflow(ActivityStatus<TActivity> inner) : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
+    {
+        internal override string Code => nameof(Overflow);
+
+        public override IEnumerable<(string, object)> EnumerateState()
+        {
+            // core: Forward inner state too in case it carried context.
+            foreach (var item in inner.EnumerateState())
+            {
+                yield return item;
+            }
+
+            // core: Preserve the inner status's code for reference.
+            yield return (nameof(Overflow), inner.Code);
+        }
+
+        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        {
+            // core: Raise the level of the inner status to warning.
+            return base.Render(activity, duration) with { Level = LogLevel.Warning };
+        }
+    }
 }
 
 [Channel]
-public abstract class Output : Channel.Output
+public abstract class Output
 {
     public abstract class Workflow
     {
-        [OnDisposeWithoutLastStatus.LogMissing]
+        [LastStatusOverflowThrows]
         public class ExecuteStep : Activity
         {
             public class Now : ExecuteStep, IEnumerableState
@@ -504,11 +506,9 @@ public abstract class Output : Channel.Output
     }
 }
 
-[Channel]
-public abstract class Engine : Channel.Engine
+public abstract class Engine
 {
-    [OnDisposeWithoutLastStatus.LogVoid]
-    [OnLogStatusWithLast.LogOverflow]
+    [LastStatusIsVoid]
     public class DeleteFile : Activity, IEnumerableState
     {
         public required string Path { get; init; }
