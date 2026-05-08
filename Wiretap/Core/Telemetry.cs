@@ -28,11 +28,10 @@ public abstract class Stream
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public class LastStatusOverflowThrows : Attribute;
+public class LastStatusMustNotOverflow : Attribute;
 
-// todo: this needs a better name.
 [AttributeUsage(AttributeTargets.Class)]
-public class LastStatusIsVoid : Attribute;
+public class LastStatusMustBeVoid : Attribute;
 
 [AttributeUsage(AttributeTargets.Class)]
 public class ChannelAttribute(string? name = null) : Attribute
@@ -107,7 +106,10 @@ public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<strin
 
     public static ILogger<T> With(ILogger<T> logger, params (string Key, object? Value)[] items)
     {
-        if (items.Length == 0) throw new ArgumentException($"The code is trying to extend the {typeof(T).Name} logger scope with no items. Either the call is unnecessary or the items array was not populated correctly.", nameof(items));
+        if (items.Length == 0)
+        {
+            throw new ArgumentException($"The code is trying to extend the {typeof(T).Name} logger scope with no items. Either the call is unnecessary or the items array was not populated correctly.", nameof(items));
+        }
 
         var keyValuePairs = items.Select(item => new KeyValuePair<string, object?>(item.Key, item.Value));
 
@@ -133,13 +135,14 @@ public static class LoggerExtensions
     extension<T>(ILogger<T> logger)
     {
         public ILogger<TChannel> Channel<TChannel>() => logger.MapAs<T, TChannel>().WithState((nameof(Channel), typeof(TChannel).Name));
+        public ILogger<TStream> Stream<TStream>() => logger.MapAs<T, TStream>().WithState((nameof(Stream), typeof(TStream).Name));
 
         public ILogger<Channel.Output> Output => logger.Channel<T, Channel.Output>();
         public ILogger<Channel.Engine> Engine => logger.Channel<T, Channel.Engine>();
 
-        public ILogger<Stream.Data> Data => logger.MapAs<T, Stream.Data>().WithState((nameof(Stream), nameof(Stream.Data)));
-        public ILogger<Stream.Note> Note => logger.MapAs<T, Stream.Note>().WithState((nameof(Stream), nameof(Stream.Note)));
-        public ILogger<Stream.Text> Text => logger.MapAs<T, Stream.Text>().WithState((nameof(Stream), nameof(Stream.Text)));
+        public ILogger<Stream.Data> Data => logger.Stream<T, Stream.Data>();
+        public ILogger<Stream.Note> Note => logger.Stream<T, Stream.Note>();
+        public ILogger<Stream.Text> Text => logger.Stream<T, Stream.Text>();
 
         public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
         {
@@ -172,6 +175,33 @@ public static class DictionaryExtensions
     }
 }
 
+public record LogContext(string Activity, string Channel, string Stream, TimeSpan Duration, bool Overflow, IEnumerableState? State) : IEnumerableState
+{
+    public IEnumerable<(string Key, object Value)> EnumerateState()
+    {
+        yield return (nameof(Activity), Activity);
+        yield return (nameof(Channel), Channel);
+        yield return (nameof(Stream), Stream);
+
+        if (Duration > TimeSpan.Zero)
+        {
+            if (Overflow)
+            {
+                yield return ("ElapsedMs", (int)Duration.TotalMilliseconds);
+            }
+            else
+            {
+                yield return ("DurationMs", (int)Duration.TotalMilliseconds);
+            }
+        }
+
+        foreach (var (key, value) in State?.EnumerateState() ?? [])
+        {
+            yield return (key, value);
+        }
+    }
+}
+
 // core: This class may not be a logger, because it will circumvent the LogStatus constraints for statuses allowing to apply IStatusOnly to an IStatusWithDuration scope!
 public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : Activity
 {
@@ -181,63 +211,67 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
     private Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
 
     // util: Track all status for debugging. It is for free.
-    private Stack<ActivityStatus<TActivity>> StatusHistory { get; } = new();
+    private Stack<(ActivityStatus<TActivity> Status, LogContext Context)> StatusHistory { get; } = new();
 
-    private bool ContainsLast => StatusHistory.OfType<ILastStatus>().Any();
+    private bool ContainsLastStatus => StatusHistory.Any(x => x.Status is ILastStatus);
 
     public ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
     {
+        if (activity.LastStatusMustBeVoid && status is ILastStatus and IUserStatus)
+        {
+            throw new InvalidOperationException(
+                $"The code is trying to log the '{status.Code}' last status for the '{activity.Name}' activity, " +
+                $"but activities with the '{nameof(LastStatusMustBeVoid)}' attribute can't have an explicit last status.");
+        }
+
+        if (activity.LastStatusMustNotOverflow && ContainsLastStatus)
+        {
+            throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
+        }
+
         if (status is ILastStatus)
         {
-            if (status is not IAutoStatus)
+            // core: This is an overflow!
+            if (status is IUserStatus && ContainsLastStatus)
             {
-                if (activity.LastStatusIsVoid)
-                {
-                    throw new InvalidOperationException(
-                        $"The code is trying to log the '{status.Code}' last status for the '{activity.Name}' activity, " +
-                        $"but activities with the '{nameof(LastStatusIsVoid)}' attribute can't have an explicit last status.");
-                }
-
-                // core: If the last status is already logged...
-                if (ContainsLast)
-                {
-                    if (activity.LastStatusOverflowThrows)
-                    {
-                        throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
-                    }
-
-                    status = new ActivityStatus<TActivity>.Overflow(status);
-                }
+                status = new ActivityStatus<TActivity>.Leak(status);
             }
 
             ActivityWrapper.Stop(isOk: status switch
             {
-                ActivityStatus<TActivity>.Ok => true,
-                ActivityStatus<TActivity>.Error => false,
+                ActivityStatus<TActivity>.Okay => true,
+                ActivityStatus<TActivity>.Fail => false,
                 _ => null
             });
         }
 
 
-        status.Log(logger, activity, Stopwatch.Elapsed);
+        var context = new LogContext
+        (
+            activity.Name,
+            activity.Channel,
+            nameof(Stream.Data),
+            Stopwatch.Elapsed,
+            ContainsLastStatus,
+            activity as IEnumerableState
+        );
+        status.Log(logger, context);
 
-        StatusHistory.Push(status);
+        StatusHistory.Push((status, context));
         return this;
     }
 
     public void Dispose()
     {
-        // note: There is no last status!
-        if (!StatusHistory.OfType<ILastStatus>().Any())
+        if (!ContainsLastStatus)
         {
-            switch (activity.LastStatusIsVoid)
+            if (activity.LastStatusMustBeVoid)
             {
-                case true:
-                    LogStatus(new ActivityStatus<TActivity>.Void());
-                    break;
-                case false:
-                    LogStatus(new ActivityStatus<TActivity>.Missing());
-                    break;
+                LogStatus(new ActivityStatus<TActivity>.Void());
+            }
+            else
+            {
+                LogStatus(new ActivityStatus<TActivity>.Last());
             }
         }
 
@@ -246,7 +280,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 
     public static ActivityScope<TActivity> Start<T>(ILogger<T> logger, TActivity activity)
     {
-        return new ActivityScope<TActivity>(logger, activity).LogStatus(new ActivityStatus<TActivity>.First());
+        return new ActivityScope<TActivity>(logger, activity).LogStatus(new ActivityStatus<TActivity>.Zero());
     }
 }
 
@@ -254,11 +288,11 @@ internal sealed class ActivityWrapper(string name) : IDisposable
 {
     private static readonly ActivitySource Source = new(nameof(Wiretap));
 
-    private System.Diagnostics.Activity? Native { get; } = Source.StartActivity(name);
+    private System.Diagnostics.Activity? Inner { get; } = Source.StartActivity(name);
 
     public void Stop(bool? isOk)
     {
-        if (Native is { IsStopped: false })
+        if (Inner is { IsStopped: false })
         {
             var statusCode = isOk switch
             {
@@ -267,19 +301,18 @@ internal sealed class ActivityWrapper(string name) : IDisposable
                 _ => System.Diagnostics.ActivityStatusCode.Unset
             };
 
-            Native
+            Inner
                 .SetStatus(statusCode)
                 .Stop();
         }
     }
 
-    public void Dispose() => Native?.Dispose();
+    public void Dispose() => Inner?.Dispose();
 }
 
 // meta: This class is required to make the message template work with structured logging as the attribute can only be used on parameters.
 public record MessageTemplate([StructuredMessageTemplate] string? Template, params object?[] Args)
 {
-    // todo: required?
     public LogLevel Level { get; init; }
 
     public Exception? Exception { get; init; }
@@ -298,10 +331,10 @@ public record MessageTemplate([StructuredMessageTemplate] string? Template, para
     {
         if (left.Exception is not null && right.Exception is not null)
         {
-            throw new InvalidOperationException("The message templates cannot contain both exceptions.");
+            throw new InvalidOperationException("Only one message template can contain an exception, but both do.");
         }
 
-        return new($"{left.Template}; {right.Template}", [..left.Args, ..right.Args])
+        return new($"{left.Template}{right.Template}", [..left.Args, ..right.Args])
         {
             Level = left.Level > right.Level ? left.Level : right.Level,
             Exception = left.Exception ?? right.Exception
@@ -309,6 +342,7 @@ public record MessageTemplate([StructuredMessageTemplate] string? Template, para
     }
 }
 
+// core: This is the base class for all activities.
 public abstract class Activity
 {
     protected Activity()
@@ -316,26 +350,29 @@ public abstract class Activity
         var channelMatch = Find<ChannelAttribute>.From(GetType());
         Channel = channelMatch.Path.First().Name;
 
-        // note: The activity name begins after the channel, so skip it.
+        // note: The activity name begins by convention after the channel, so skip it.
         Name = string.Join(".", channelMatch.Path.Skip(1).Select(t => t.Name));
 
-        LastStatusIsVoid = Find<LastStatusIsVoid>.From(GetType()).Attribute is not null;
-        LastStatusOverflowThrows = Find<LastStatusOverflowThrows>.From(GetType()).Attribute is not null;
+        LastStatusMustBeVoid = Find<LastStatusMustBeVoid>.From(GetType()).Attribute is not null;
+        LastStatusMustNotOverflow = Find<LastStatusMustNotOverflow>.From(GetType()).Attribute is not null;
     }
 
-    public bool LastStatusIsVoid { get; }
-
-    public bool LastStatusOverflowThrows { get; }
-
     public string Channel { get; }
-
     public string Name { get; }
+    public bool LastStatusMustBeVoid { get; }
+    public bool LastStatusMustNotOverflow { get; }
 }
 
-public interface IMiddleStatus;
+// core: Marks statuses that veto the execution of an activity before reaching its normal completion path.
+public interface IVetoStatus;
 
+// core: Marks statuses that users can log.
+public interface IUserStatus;
+
+// core: Marks statuses that are last in the activity's lifecycle.
 public interface ILastStatus;
 
+// core: Marks statuses that are automatically logged.
 internal interface IAutoStatus;
 
 public interface IEnumerableState
@@ -348,19 +385,19 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
     internal virtual string Code => GetType().Name;
 
     // core: Let inheritors provide their own template.
-    protected virtual MessageTemplate Render(TActivity activity, TimeSpan duration)
+    protected virtual MessageTemplate Render(LogContext context)
     {
-        var template = new MessageTemplate("{Activity}: {Status}", activity.Name, Code);
+        var template = new MessageTemplate("{Activity}[{Status}]", context.Activity, Code);
 
-        if (duration > TimeSpan.Zero)
+        if (context.Duration > TimeSpan.Zero)
         {
-            if (this is Overflow)
+            if (this is Leak)
             {
-                template += new MessageTemplate("Elapsed: {ElapsedMs:N0} ms", duration.TotalMilliseconds);
+                template += new MessageTemplate(" at {ElapsedMs:N0} ms", context.Duration.TotalMilliseconds);
             }
             else
             {
-                template += new MessageTemplate("Duration: {DurationMs:N0} ms", duration.TotalMilliseconds);
+                template += new MessageTemplate(" at {DurationMs:N0} ms", context.Duration.TotalMilliseconds);
             }
         }
 
@@ -372,85 +409,82 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
         yield break;
     }
 
-    public void Log(ILogger logger, TActivity activity, TimeSpan duration)
+    public void Log(ILogger logger, LogContext context)
     {
-        var state = new Dictionary<string, object>
-        {
-            { nameof(Activity), activity.Name },
-            { nameof(Channel), activity.Channel },
-            { nameof(Stream), nameof(Stream.Data) }
-        };
+        var state = new Dictionary<string, object>();
 
+        state.MergeStateFrom(context);
         state.MergeStateFrom(this);
-        state.MergeStateFrom(activity);
 
         using (logger.BeginScope(state))
         {
-            Render(activity, duration).Log(logger);
+            Render(context).Log(logger);
         }
     }
 
-    public class First : ActivityStatus<TActivity>
+    // note: This is the very first status. Its previous name was "First".
+    internal class Zero : ActivityStatus<TActivity>, IAutoStatus
     {
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Trace };
+            return base.Render(context) with { Level = LogLevel.Trace };
         }
     }
 
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-    public abstract class Halt : ActivityStatus<TActivity>, ILastStatus
+    public abstract class Halt : ActivityStatus<TActivity>, ILastStatus, IVetoStatus, IUserStatus
     {
         public required string Reason { get; init; }
 
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Warning } + new MessageTemplate("Reason: {Reason}", Reason);
+            return base.Render(context) with { Level = LogLevel.Warning } + new MessageTemplate("Reason: {Reason}", Reason);
         }
     }
 
     // core: This status applies when the caller does not care about the result.
     internal class Void : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
     {
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Information };
+            return base.Render(context) with { Level = LogLevel.Information };
         }
     }
 
     // core: This status applies when everything went according to plan.
-    public abstract class Ok : ActivityStatus<TActivity>, ILastStatus
+    public abstract class Okay : ActivityStatus<TActivity>, ILastStatus, IUserStatus
     {
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Information };
+            return base.Render(context) with { Level = LogLevel.Information };
         }
     }
 
     // core: This status applies when an error occured.
-    public abstract class Error : ActivityStatus<TActivity>, ILastStatus
+    public abstract class Fail : ActivityStatus<TActivity>, ILastStatus, IUserStatus
     {
         public Exception? Exception { get; init; }
 
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Error, Exception = Exception };
+            return base.Render(context) with { Level = LogLevel.Error, Exception = Exception };
         }
     }
 
     // core: This status applies when activity was not properly stopped.
-    internal class Missing : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
+    internal class Last : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
     {
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(activity, duration) with { Level = LogLevel.Warning };
+            return base.Render(context) with { Level = LogLevel.Warning };
         }
     }
 
-    internal sealed class Overflow(ActivityStatus<TActivity> inner) : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
+    // core: This status wraps another last status when it overflows.
+    internal sealed class Leak(ActivityStatus<TActivity> inner) : ActivityStatus<TActivity>, ILastStatus, IAutoStatus
     {
-        internal override string Code => nameof(Overflow);
+        internal override string Code => nameof(Leak);
 
         public override IEnumerable<(string, object)> EnumerateState()
         {
@@ -461,67 +495,13 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
             }
 
             // core: Preserve the inner status's code for reference.
-            yield return (nameof(Overflow), inner.Code);
+            yield return (nameof(Leak), inner.Code);
         }
 
-        protected override MessageTemplate Render(TActivity activity, TimeSpan duration)
+        protected override MessageTemplate Render(LogContext context)
         {
             // core: Raise the level of the inner status to warning.
-            return base.Render(activity, duration) with { Level = LogLevel.Warning };
+            return base.Render(context) with { Level = LogLevel.Warning };
         }
-    }
-}
-
-[Channel]
-public abstract class Output
-{
-    public abstract class Workflow
-    {
-        [LastStatusOverflowThrows]
-        public class ExecuteStep : Activity
-        {
-            public class Now : ExecuteStep, IEnumerableState
-            {
-                public required int StepIndex { get; init; }
-
-                public IEnumerable<(string, object)> EnumerateState()
-                {
-                    yield return new(nameof(StepIndex), StepIndex);
-                }
-
-                public sealed class Ok : ActivityStatus<Now>.Ok
-                {
-                    // note: Can be either a property or a constructor parameter. Does not really make any difference.
-                    public required int ItemsProcessed { get; init; }
-
-                    public override IEnumerable<(string, object)> EnumerateState()
-                    {
-                        return base.EnumerateState().Append((nameof(ItemsProcessed), ItemsProcessed));
-                    }
-                }
-
-                public sealed class Error : ActivityStatus<Now>.Error;
-            }
-        }
-    }
-}
-
-public abstract class Engine
-{
-    [LastStatusIsVoid]
-    public class DeleteFile : Activity, IEnumerableState
-    {
-        public required string Path { get; init; }
-
-        public IEnumerable<(string Key, object Value)> EnumerateState()
-        {
-            yield return new(nameof(Path), Path);
-        }
-
-        public sealed class Halt : ActivityStatus<DeleteFile>.Halt;
-
-        public sealed class Ok : ActivityStatus<DeleteFile>.Ok;
-
-        public sealed class Error : ActivityStatus<DeleteFile>.Error;
     }
 }

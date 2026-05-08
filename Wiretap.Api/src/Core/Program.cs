@@ -32,7 +32,7 @@ using (var scope = app.Services.CreateScope())
     using (var step = logger.Begin(new Output.Workflow.ExecuteStep.Now { StepIndex = 1 }))
     {
         logger.Output.Note.LogInformation("This step has a note.");
-        step.LogStatus(new Output.Workflow.ExecuteStep.Now.Ok { ItemsProcessed = 100 });
+        step.LogStatus(new Output.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
         //step.LogStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 
@@ -45,7 +45,7 @@ using (var scope = app.Services.CreateScope())
     //logger.LogStatus(new Engine.DeleteFile.Ok("test.txt"));
     //logger.Engine.LogStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
 
-    using (logger.Begin(new Engine.DeleteFile { Path = "test.txt" }))
+    using (logger.Begin(new Engine.CopyFile { Path = "test.txt" }))
     {
         // busy...
     }
@@ -55,8 +55,8 @@ using (var scope = app.Services.CreateScope())
     using (var delete = logger.Begin(new Engine.DeleteFile { Path = "test.txt" }))
     {
         delete.LogStatus(new Engine.DeleteFile.Halt { Reason = "File not found." });
-        delete.LogStatus(new Engine.DeleteFile.Error());
-        delete.LogStatus(new Engine.DeleteFile.Ok());
+        delete.LogStatus(new Engine.DeleteFile.Fail());
+        delete.LogStatus(new Engine.DeleteFile.Okay());
     }
 }
 
