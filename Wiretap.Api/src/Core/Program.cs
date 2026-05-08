@@ -56,6 +56,7 @@ using (var scope = app.Services.CreateScope())
     {
         delete.LogStatus(new Engine.DeleteFile.Halt { Reason = "File not found." });
         delete.LogStatus(new Engine.DeleteFile.Fail());
+        delete.LogDebug("Logged at busy status.");
         delete.LogStatus(new Engine.DeleteFile.Okay());
     }
 }

@@ -28,7 +28,7 @@ public abstract class Stream
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public class LastStatusMustNotOverflow : Attribute;
+public class LastStatusMustNotLeak : Attribute;
 
 [AttributeUsage(AttributeTargets.Class)]
 public class LastStatusMustBeVoid : Attribute;
@@ -224,7 +224,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
                 $"but activities with the '{nameof(LastStatusMustBeVoid)}' attribute can't have an explicit last status.");
         }
 
-        if (activity.LastStatusMustNotOverflow && ContainsLastStatus)
+        if (activity.LastStatusMustNotLeak && ContainsLastStatus)
         {
             throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
         }
@@ -259,6 +259,16 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 
         StatusHistory.Push((status, context));
         return this;
+    }
+
+    public void LogDebug([StructuredMessageTemplate] string? message, params object?[] args)
+    {
+        LogStatus(new ActivityStatus<TActivity>.Busy(LogLevel.Debug, new(message, args)));
+    }
+
+    public void LogTrace([StructuredMessageTemplate] string? message, params object?[] args)
+    {
+        LogStatus(new ActivityStatus<TActivity>.Busy(LogLevel.Trace, new(message, args)));
     }
 
     public void Dispose()
@@ -354,13 +364,13 @@ public abstract class Activity
         Name = string.Join(".", channelMatch.Path.Skip(1).Select(t => t.Name));
 
         LastStatusMustBeVoid = Find<LastStatusMustBeVoid>.From(GetType()).Attribute is not null;
-        LastStatusMustNotOverflow = Find<LastStatusMustNotOverflow>.From(GetType()).Attribute is not null;
+        LastStatusMustNotLeak = Find<LastStatusMustNotLeak>.From(GetType()).Attribute is not null;
     }
 
     public string Channel { get; }
     public string Name { get; }
     public bool LastStatusMustBeVoid { get; }
-    public bool LastStatusMustNotOverflow { get; }
+    public bool LastStatusMustNotLeak { get; }
 }
 
 // core: Marks statuses that veto the execution of an activity before reaching its normal completion path.
@@ -439,7 +449,7 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
 
         protected override MessageTemplate Render(LogContext context)
         {
-            return base.Render(context) with { Level = LogLevel.Warning } + new MessageTemplate("Reason: {Reason}", Reason);
+            return base.Render(context) with { Level = LogLevel.Warning } + new MessageTemplate("; Reason: {Reason}", Reason);
         }
     }
 
@@ -458,6 +468,14 @@ public abstract class ActivityStatus<TActivity> : IEnumerableState where TActivi
         protected override MessageTemplate Render(LogContext context)
         {
             return base.Render(context) with { Level = LogLevel.Information };
+        }
+    }
+
+    internal class Busy(LogLevel level, MessageTemplate template) : ActivityStatus<TActivity>, IAutoStatus
+    {
+        protected override MessageTemplate Render(LogContext context)
+        {
+            return base.Render(context) with { Level = level } + new MessageTemplate("; ") + template;
         }
     }
 

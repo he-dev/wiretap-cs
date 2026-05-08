@@ -5,7 +5,7 @@ public abstract class Output
 {
     public abstract class Workflow
     {
-        [LastStatusMustNotOverflow]
+        [LastStatusMustNotLeak]
         public class ExecuteStep : Activity
         {
             public class Now : ExecuteStep, IEnumerableState
