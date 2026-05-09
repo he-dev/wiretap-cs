@@ -1,6 +1,6 @@
 ﻿namespace Wiretap.Core;
 
-[Channel]
+[ActivityDomain]
 public abstract class Output
 {
     public abstract class Workflow
@@ -13,13 +13,13 @@ public abstract class Output
                 [ScopeState]
                 public required int StepIndex { get; init; }
 
-                public sealed class Okay : ActivityStatus<Now>.Okay
+                public sealed class Okay : ExplicitStatus<Now>.Okay
                 {
                     [ScopeState]
                     public required int ItemsProcessed { get; init; }
                 }
 
-                public sealed class Fail : ActivityStatus<Now>.Fail;
+                public sealed class Fail : ExplicitStatus<Now>.Fail;
             }
         }
     }
@@ -33,11 +33,11 @@ public abstract class Engine
         [ScopeState]
         public required string Path { get; init; }
 
-        public sealed class Halt : ActivityStatus<DeleteFile>.Halt;
+        public sealed class Halt : ExplicitStatus<DeleteFile>.Halt;
 
-        public sealed class Okay : ActivityStatus<DeleteFile>.Okay;
+        public sealed class Okay : ExplicitStatus<DeleteFile>.Okay;
 
-        public sealed class Fail : ActivityStatus<DeleteFile>.Fail;
+        public sealed class Fail : ExplicitStatus<DeleteFile>.Fail;
     }
 
     [LastStatusPolicy.MustBeVoid]
@@ -48,7 +48,7 @@ public abstract class Engine
 
         public IEnumerable<(string Key, object Value)> States()
         {
-            yield return new("Custom", "State");
+            yield return new("CustomItem", "CustomValue");
         }
     }
 }

@@ -8,25 +8,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Wiretap.Core;
 
-public abstract class Channel
+public abstract class ActivityDomain
 {
     // core: Logs about what the system is supposed to produce.
-    public abstract class Output : Channel;
+    public abstract class Output : ActivityDomain;
 
     // core: Logs about what allows the system able to produce.
-    public abstract class Engine : Channel;
+    public abstract class Engine : ActivityDomain;
 }
 
-public abstract class Stream
+public abstract class MessageRole
 {
     // core: Pure telemetry data.
     public abstract class Data;
 
     // core: Something nice to know about what is going on.
-    public abstract class Note;
+    public abstract class Clue;
 
     // core: Readable entries meant for the console.
-    public abstract class Text;
+    public abstract class News;
 }
 
 [AttributeUsage(AttributeTargets.Class)]
@@ -38,7 +38,7 @@ public abstract class LastStatusPolicy : Attribute
 }
 
 [AttributeUsage(AttributeTargets.Class)]
-public class ChannelAttribute(string? name = null) : Attribute
+public class ActivityDomainAttribute(string? name = null) : Attribute
 {
     public string? Name { get; } = name;
 }
@@ -207,43 +207,16 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ILogger<TChannel> Channel<TChannel>() => logger.MapAs<T, TChannel>().WithState((nameof(Channel), typeof(TChannel).Name));
-        public ILogger<TStream> Stream<TStream>() => logger.MapAs<T, TStream>().WithState((nameof(Stream), typeof(TStream).Name));
+        public ILogger<ActivityDomain.Output> Output => logger.MapAs<T, ActivityDomain.Output>().WithState((nameof(ActivityDomain), nameof(ActivityDomain.Output)));
+        public ILogger<ActivityDomain.Engine> Engine => logger.MapAs<T, ActivityDomain.Engine>().WithState((nameof(ActivityDomain), nameof(ActivityDomain.Engine)));
 
-        public ILogger<Channel.Output> Output => logger.Channel<T, Channel.Output>();
-        public ILogger<Channel.Engine> Engine => logger.Channel<T, Channel.Engine>();
-
-        public ILogger<Stream.Data> Data => logger.Stream<T, Stream.Data>();
-        public ILogger<Stream.Note> Note => logger.Stream<T, Stream.Note>();
-        public ILogger<Stream.Text> Text => logger.Stream<T, Stream.Text>();
+        public ILogger<MessageRole.Data> Data => logger.MapAs<T, MessageRole.Data>().WithState((nameof(MessageRole), nameof(MessageRole.Data)));
+        public ILogger<MessageRole.Clue> Clue => logger.MapAs<T, MessageRole.Clue>().WithState((nameof(MessageRole), nameof(MessageRole.Clue)));
+        public ILogger<MessageRole.News> News => logger.MapAs<T, MessageRole.News>().WithState((nameof(MessageRole), nameof(MessageRole.News)));
 
         public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
         {
             return ActivityScope<TActivity>.Start(logger, activity);
-        }
-    }
-}
-
-public static class DictionaryExtensions
-{
-    extension(IDictionary<string, object> state)
-    {
-        public void MergeStateFrom<T>(T source)
-        {
-            if (source is not IProvidesStateItems enumerableState)
-            {
-                return;
-            }
-
-            foreach (var (key, value) in enumerableState.States())
-            {
-                if (state.TryGetValue(key, out var currentValue))
-                {
-                    throw new InvalidOperationException($"The type '{typeof(T).FullName}' tries to add the key '{key}' with value '{value}', but it already exists with value '{currentValue}'.");
-                }
-
-                state.Add(key, value);
-            }
         }
     }
 }
@@ -254,10 +227,10 @@ public record LogContext
 
     public required string Status { get; init; }
 
-    public required string Channel { get; init; }
+    public required string ActivityDomain { get; init; }
 
     [ScopeState]
-    public required string Stream { get; init; }
+    public required string MessageRole { get; init; }
 
     [ScopeState]
     public required long ElapsedMs { get; init; }
@@ -295,13 +268,13 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             // core: This is an overflow!
             if (status is StatusRole.IUser && ContainsLastStatus)
             {
-                status = new ActivityStatus<TActivity>.Leak(status);
+                status = new ImplicitStatus<TActivity>.Leak(status);
             }
 
             ActivityWrapper.Stop(isOk: status switch
             {
-                ActivityStatus<TActivity>.Okay => true,
-                ActivityStatus<TActivity>.Fail => false,
+                ExplicitStatus<TActivity>.Okay => true,
+                ExplicitStatus<TActivity>.Fail => false,
                 _ => null
             });
         }
@@ -310,8 +283,8 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
         {
             Activity = activity.Name,
             Status = status.Status,
-            Channel = activity.Channel,
-            Stream = nameof(Stream.Data),
+            ActivityDomain = activity.ActivityDomain,
+            MessageRole = nameof(MessageRole.Data),
             ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
         };
 
@@ -343,12 +316,12 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 
     public void LogDebug([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(ActivityStatus<TActivity>.Busy.Debug(new(message, args)));
+        LogStatus(ImplicitStatus<TActivity>.Busy.Debug(new(message, args)));
     }
 
     public void LogTrace([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(ActivityStatus<TActivity>.Busy.Trace(new(message, args)));
+        LogStatus(ImplicitStatus<TActivity>.Busy.Trace(new(message, args)));
     }
 
     public void Dispose()
@@ -357,11 +330,11 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
         {
             if (activity.LastStatusMustBeVoid)
             {
-                LogStatus(new ActivityStatus<TActivity>.Void());
+                LogStatus(new ImplicitStatus<TActivity>.Void());
             }
             else
             {
-                LogStatus(new ActivityStatus<TActivity>.Last());
+                LogStatus(new ImplicitStatus<TActivity>.Last());
             }
         }
 
@@ -370,7 +343,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 
     public static ActivityScope<TActivity> Start<T>(ILogger<T> logger, TActivity activity)
     {
-        return new ActivityScope<TActivity>(logger, activity).LogStatus(new ActivityStatus<TActivity>.Zero());
+        return new ActivityScope<TActivity>(logger, activity).LogStatus(new ImplicitStatus<TActivity>.Zero());
     }
 }
 
@@ -408,11 +381,11 @@ public abstract class Activity
 {
     protected Activity()
     {
-        var channelMatch = Find<ChannelAttribute>.From(GetType());
-        Channel = channelMatch.Path.First().Name;
+        var activityDomainMatch = Find<ActivityDomainAttribute>.From(GetType());
+        ActivityDomain = activityDomainMatch.Path.First().Name;
 
         // note: The activity name begins by convention after the channel, so skip it.
-        Name = string.Join(".", channelMatch.Path.Skip(1).Select(t => t.Name));
+        Name = string.Join(".", activityDomainMatch.Path.Skip(1).Select(t => t.Name));
 
         LastStatusMustBeVoid = Find<LastStatusPolicy.MustBeVoid>.From(GetType()).Attribute is not null;
         LastStatusMustNotLeak = Find<LastStatusPolicy.MustNotLeak>.From(GetType()).Attribute is not null;
@@ -421,7 +394,7 @@ public abstract class Activity
 
 
     [ScopeState]
-    public string Channel { get; }
+    public string ActivityDomain { get; }
 
     [ScopeState(nameof(Activity))]
     public string Name { get; }
@@ -445,7 +418,7 @@ public static class StatusRole
     public interface ILast;
 
     // core: Marks statuses that are automatically logged.
-    internal interface IAuto;
+    public interface IAuto;
 }
 
 public interface IProvidesStateItems
@@ -466,13 +439,10 @@ public abstract class ActivityStatus<TActivity> where TActivity : Activity
     public abstract LogLevel Level { get; }
 
     public Exception? Exception { get; init; }
+}
 
-    // note: This is the very first status. Its previous name was "First".
-    internal class Zero : ActivityStatus<TActivity>, StatusRole.IAuto
-    {
-        public override LogLevel Level => LogLevel.Trace;
-    }
-
+public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
+{
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
     public abstract class Halt : ActivityStatus<TActivity>, IMessageTemplateParts, StatusRole.ILast, StatusRole.IVeto, StatusRole.IUser
@@ -487,16 +457,25 @@ public abstract class ActivityStatus<TActivity> where TActivity : Activity
         }
     }
 
-    // core: This status applies when the caller does not care about the result.
-    internal class Void : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IAuto
-    {
-        public override LogLevel Level => LogLevel.Information;
-    }
-
     // core: This status applies when everything went according to plan.
     public abstract class Okay : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
     {
         public override LogLevel Level => LogLevel.Information;
+    }
+
+    // core: This status applies when an error occured.
+    public abstract class Fail : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    {
+        public override LogLevel Level => LogLevel.Error;
+    }
+}
+
+internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
+{
+    // note: This is the very first status. Its previous name was "First".
+    internal class Zero : ActivityStatus<TActivity>, StatusRole.IAuto
+    {
+        public override LogLevel Level => LogLevel.Trace;
     }
 
     internal class Busy(LogLevel level, MessageTemplate template) : ActivityStatus<TActivity>, StatusRole.IAuto, IMessageTemplateParts
@@ -513,10 +492,10 @@ public abstract class ActivityStatus<TActivity> where TActivity : Activity
         public static Busy Trace(MessageTemplate template) => new(LogLevel.Trace, template);
     }
 
-    // core: This status applies when an error occured.
-    public abstract class Fail : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    // core: This status applies when the caller does not care about the result.
+    internal class Void : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IAuto
     {
-        public override LogLevel Level => LogLevel.Error;
+        public override LogLevel Level => LogLevel.Information;
     }
 
     // core: This status applies when activity was not properly stopped.
