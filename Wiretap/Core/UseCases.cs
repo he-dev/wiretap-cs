@@ -5,17 +5,17 @@ public abstract class Output
 {
     public abstract class Workflow
     {
-        [LastStatusPolicy.MustNotLeak]
+        [LastStatusPolicy.MuteLeaks]
         public class ExecuteStep : Activity
         {
             public class Now : ExecuteStep
             {
-                [ScopeState]
+                [ScopeStateItem]
                 public required int StepIndex { get; init; }
 
                 public sealed class Okay : ExplicitStatus<Now>.Okay
                 {
-                    [ScopeState]
+                    [ScopeStateItem]
                     public required int ItemsProcessed { get; init; }
                 }
 
@@ -28,9 +28,10 @@ public abstract class Output
 [CompactMessageSchema]
 public abstract class Engine
 {
+    [LastStatusPolicy.MuteLeaks]
     public class DeleteFile : Activity
     {
-        [ScopeState]
+        [ScopeStateItem]
         public required string Path { get; init; }
 
         public sealed class Halt : ExplicitStatus<DeleteFile>.Halt;
@@ -40,13 +41,13 @@ public abstract class Engine
         public sealed class Fail : ExplicitStatus<DeleteFile>.Fail;
     }
 
-    [LastStatusPolicy.MustBeVoid]
-    public class CopyFile : Activity, IProvidesStateItems
+    [LastStatusPolicy.CanBeVoid]
+    public class CopyFile : Activity, IWithStateItems
     {
-        [ScopeState]
+        [ScopeStateItem]
         public required string Path { get; init; }
 
-        public IEnumerable<(string Key, object Value)> States()
+        public IEnumerable<KeyValuePair<string, object?>> StateItems()
         {
             yield return new("CustomItem", "CustomValue");
         }

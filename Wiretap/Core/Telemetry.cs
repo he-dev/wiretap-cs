@@ -1,8 +1,9 @@
-﻿using System.Collections;
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
@@ -32,9 +33,14 @@ public abstract class MessageRole
 [AttributeUsage(AttributeTargets.Class)]
 public abstract class LastStatusPolicy : Attribute
 {
-    public class MustNotLeak : LastStatusPolicy;
+    public class CanBeVoid : LastStatusPolicy;
 
-    public class MustBeVoid : LastStatusPolicy;
+    // core: Mutes leaks except fails.
+    public class MuteLeaks : LastStatusPolicy
+    {
+        // core: Does not log leaks.
+        public bool Silently { get; init; }
+    }
 }
 
 [AttributeUsage(AttributeTargets.Class)]
@@ -59,18 +65,35 @@ public sealed class CompactMessageSchema(string separator = "; ") : MessageSchem
             new("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs)
         };
 
-        return root.Concat(others).Aggregate((c, n) => new($"{c.Template}{separator}{n.Template}", [..c.Args, ..n.Args]));
+        // meta: Low performance.
+        //return root.Concat(others).Aggregate((c, n) => new($"{c.Template}{separator}{n.Template}", [..c.Args, ..n.Args]));
+
+        var msgs = new StringBuilder();
+        var args = new List<object?>();
+
+        foreach (var part in root.Concat(others))
+        {
+            if (msgs.Length > 0)
+            {
+                msgs.Append(separator);
+            }
+
+            msgs.Append(part.Template);
+            args.AddRange(part.Args);
+        }
+
+        return new(msgs.ToString(), args.ToArray());
     }
 }
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public class ScopeState(string? name = null) : Attribute
+public class ScopeStateItem(string? name = null) : Attribute
 {
-    private string? Name { get; } = name;
+    public string? Name { get; } = name;
 
-    private static readonly ConcurrentDictionary<Type, (MemberInfo Member, ScopeState State)[]> Cache = new();
+    private static readonly ConcurrentDictionary<Type, (MemberInfo Member, ScopeStateItem State)[]> Cache = new();
 
-    public static IEnumerable<(string Key, object Value)> From<T>(T source) where T : notnull
+    public static IEnumerable<KeyValuePair<string, object?>> From<T>(T source) where T : notnull
     {
         var members = Cache.GetOrAdd(source.GetType(), Discover);
 
@@ -85,18 +108,18 @@ public class ScopeState(string? name = null) : Attribute
 
             if (value is not null)
             {
-                yield return (attr.Name ?? member.Name, value);
+                yield return new(attr.Name ?? member.Name, value);
             }
         }
     }
 
-    private static (MemberInfo Member, ScopeState State)[] Discover(Type type)
+    private static (MemberInfo Member, ScopeStateItem State)[] Discover(Type type)
     {
         const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
         var properties =
             from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<ScopeState>()
+            let attr = property.GetCustomAttribute<ScopeStateItem>()
             where attr is not null
             select ((MemberInfo)property, attr);
 
@@ -104,7 +127,7 @@ public class ScopeState(string? name = null) : Attribute
 
         var fields =
             from field in type.GetFields(flags)
-            let attr = field.GetCustomAttribute<ScopeState>()
+            let attr = field.GetCustomAttribute<ScopeStateItem>()
             where attr is not null
             select ((MemberInfo)field, attr);
 
@@ -112,28 +135,85 @@ public class ScopeState(string? name = null) : Attribute
     }
 }
 
+public static class GetScopeStatePropertyValues
+{
+    private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
+
+    public static IEnumerable<KeyValuePair<string, object?>> From<T>(T source) where T : notnull
+    {
+        var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
+
+        foreach (var getter in getters)
+        {
+            var value = getter.GetValue(source);
+
+            if (value is not null)
+            {
+                yield return new(getter.Key, value);
+            }
+        }
+    }
+
+    private static Getter[] DiscoverStateItems(Type type)
+    {
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+        var stateItemGetters =
+            from property in type.GetProperties(flags)
+            let attr = property.GetCustomAttribute<ScopeStateItem>()
+            where attr is not null
+            select new Getter(attr.Name ?? property.Name, Getter.Compile(type, property));
+
+        return [..stateItemGetters];
+    }
+
+    private sealed record Getter(string Key, Func<object, object?> GetValue)
+    {
+        public static Func<object, object?> Compile(Type type, PropertyInfo property)
+        {
+            if (!property.CanRead)
+            {
+                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(ScopeStateItem)}' but does not have a getter.");
+            }
+
+            var source = Expression.Parameter(typeof(object), "source");
+            var typedSource = Expression.Convert(source, type);
+            var value = Expression.Property(typedSource, property);
+            var boxedValue = Expression.Convert(value, typeof(object));
+            return Expression.Lambda<Func<object, object?>>(boxedValue, source).Compile();
+        }
+    }
+}
+
 public static class Find<TAttribute> where TAttribute : Attribute
 {
+    private static readonly ConcurrentDictionary<Type, object> Cache = new();
+
     public static AttributeMatch<TAttribute> From<TActivity>() => From(typeof(TActivity));
 
     public static AttributeMatch<TAttribute> From(Type type)
     {
-        var path = new Stack<Type>();
-        var visited = new List<Type>();
+        return (AttributeMatch<TAttribute>)Cache.GetOrAdd(type, Discover);
+    }
+
+    private static object Discover(Type type)
+    {
+        var parts = new Stack<Type>();
+        var types = new List<Type>();
 
         for (var current = type; current is not null; current = current.DeclaringType)
         {
-            path.Push(current);
-            visited.Add(current);
+            parts.Push(current);
+            types.Add(current);
 
             // core: Collecting only the first attribute of each type.
             if (current.GetCustomAttribute<TAttribute>(inherit: false) is { } attribute)
             {
-                return new(attribute, visited.ToArray(), path.ToArray());
+                return new AttributeMatch<TAttribute>(attribute, types.ToArray(), parts.ToArray());
             }
         }
 
-        return new(null, visited.ToArray(), path.ToArray());
+        return new AttributeMatch<TAttribute>(null, types.ToArray(), parts.ToArray());
     }
 }
 
@@ -146,7 +226,7 @@ public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<strin
 {
     private ILogger Inner { get; } = inner;
 
-    private IImmutableDictionary<string, object?> Items { get; } = items.ToImmutableDictionary();
+    private IEnumerable<KeyValuePair<string, object?>> Items => items;
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Inner.BeginScope(state);
 
@@ -154,16 +234,9 @@ public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<strin
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        if (Items.Count == 0)
+        using (BeginScope(Items))
         {
             Inner.Log(logLevel, eventId, state, exception, formatter);
-        }
-        else
-        {
-            using (BeginScope(Items))
-            {
-                Inner.Log(logLevel, eventId, state, exception, formatter);
-            }
         }
     }
 
@@ -174,7 +247,7 @@ public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<strin
         return
             logger is LoggerProxy<T> proxy
                 ? new LoggerProxy<TOther>(proxy.Inner, proxy.Items)
-                : new LoggerProxy<TOther>(logger, ImmutableDictionary<string, object?>.Empty);
+                : new LoggerProxy<TOther>(logger, []);
     }
 
     public static ILogger<T> With(ILogger<T> logger, params (string Key, object? Value)[] items)
@@ -188,7 +261,7 @@ public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<strin
 
         return
             logger is LoggerProxy<T> proxy
-                ? new LoggerProxy<T>(proxy.Inner, proxy.Items.SetItems(keyValuePairs))
+                ? new LoggerProxy<T>(proxy.Inner, proxy.Items.Concat(keyValuePairs))
                 : new LoggerProxy<T>(logger, keyValuePairs);
     }
 }
@@ -229,10 +302,10 @@ public record LogContext
 
     public required string ActivityDomain { get; init; }
 
-    [ScopeState]
+    [ScopeStateItem]
     public required string MessageRole { get; init; }
 
-    [ScopeState]
+    [ScopeStateItem]
     public required long ElapsedMs { get; init; }
 }
 
@@ -245,32 +318,32 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
     private Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
 
     // util: Track all status for debugging. It is for free.
-    private Stack<(ActivityStatus<TActivity> Status, LogContext Context)> StatusHistory { get; } = new();
+    //public Stack<(ActivityStatus<TActivity> Status, LogContext Context)> StatusHistory { get; } = new();
 
-    private bool ContainsLastStatus => StatusHistory.Any(x => x.Status is StatusRole.ILast);
+    private bool ContainsLastStatus { get; set; }
 
-    public ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
+    public ActivityScope<TActivity> LogStatus(ExplicitStatus<TActivity> status)
     {
-        if (activity.LastStatusMustBeVoid && status is StatusRole.ILast and StatusRole.IUser)
+        // core: Mute leaks except fails.
+        if (status is StatusRole.ILast && ContainsLastStatus && status is not ExplicitStatus<TActivity>.Fail)
         {
-            throw new InvalidOperationException(
-                $"The code is trying to log the '{status.Status}' last status for the '{activity.Name}' activity, " +
-                $"but activities with the '{nameof(LastStatusPolicy.MustBeVoid)}' attribute can't have an explicit last status.");
-        }
-
-        if (activity.LastStatusMustNotLeak && ContainsLastStatus)
-        {
-            throw new InvalidOperationException($"The code is trying to log another last status for the '{activity.Name}' activity, but activities can have only one last status.");
-        }
-
-        if (status is StatusRole.ILast)
-        {
-            // core: This is an overflow!
-            if (status is StatusRole.IUser && ContainsLastStatus)
+            if (activity.MuteLeaks is { } muteLeaks)
             {
-                status = new ImplicitStatus<TActivity>.Leak(status);
+                return muteLeaks.Silently ? this : LogStatus(new ImplicitStatus<TActivity>.Leak(status));
             }
 
+            throw new InvalidOperationException($"The code is trying to log '{status.Status}' as another last status for the '{activity.Name}' activity, but activities can have only one last status.");
+        }
+
+        // meta: Needs to cast so the right overload is called.
+        return LogStatus((ActivityStatus<TActivity>)status);
+    }
+
+    private ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
+    {
+        if (status is StatusRole.ILast)
+        {
+            ContainsLastStatus = true;
             ActivityWrapper.Stop(isOk: status switch
             {
                 ExplicitStatus<TActivity>.Okay => true,
@@ -288,27 +361,31 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
         };
 
-        var stateItems = ScopeState.From(activity).Concat(ScopeState.From(context));
+        // meta: Using a list rather than Enumerable.Concat for performance reasons.
+        var stateItems = new List<KeyValuePair<string, object?>>(16);
 
-        if (activity is IProvidesStateItems activityItems)
+        stateItems.AddRange(GetScopeStatePropertyValues.From(activity));
+        stateItems.AddRange(GetScopeStatePropertyValues.From(context));
+
+        if (activity is IWithStateItems activityItems)
         {
-            stateItems = stateItems.Concat(activityItems.States());
+            stateItems.AddRange(activityItems.StateItems());
         }
 
-        if (status is IProvidesStateItems statusItems)
+        if (status is IWithStateItems statusItems)
         {
-            stateItems = stateItems.Concat(statusItems.States());
+            stateItems.AddRange(statusItems.StateItems());
         }
 
-        stateItems = stateItems.Concat(ScopeState.From(status));
+        stateItems.AddRange(ScopeStateItem.From(status));
 
-        using (logger.BeginScope(stateItems.ToDictionary()))
+        using (logger.BeginScope(stateItems))
         {
-            var statusParts = (status as IMessageTemplateParts)?.Parts(context) ?? [];
+            var statusParts = (status as IWithMessageParts)?.MessageParts(context) ?? [];
             var template = activity.MessageSchema.From(context, statusParts);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
 
-            StatusHistory.Push((status, context));
+            //StatusHistory.Push((status, context));
         }
 
         return this;
@@ -328,14 +405,8 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
     {
         if (!ContainsLastStatus)
         {
-            if (activity.LastStatusMustBeVoid)
-            {
-                LogStatus(new ImplicitStatus<TActivity>.Void());
-            }
-            else
-            {
-                LogStatus(new ImplicitStatus<TActivity>.Last());
-            }
+            var level = activity.CanBeVoid is null ? LogLevel.Warning : LogLevel.Information;
+            LogStatus(new ImplicitStatus<TActivity>.Void(level));
         }
 
         ActivityWrapper.Dispose();
@@ -387,21 +458,23 @@ public abstract class Activity
         // note: The activity name begins by convention after the channel, so skip it.
         Name = string.Join(".", activityDomainMatch.Path.Skip(1).Select(t => t.Name));
 
-        LastStatusMustBeVoid = Find<LastStatusPolicy.MustBeVoid>.From(GetType()).Attribute is not null;
-        LastStatusMustNotLeak = Find<LastStatusPolicy.MustNotLeak>.From(GetType()).Attribute is not null;
+        // todo: Collapse to a single property looking for the policy attribute!
+
+        CanBeVoid = Find<LastStatusPolicy.CanBeVoid>.From(GetType()).Attribute;
+        MuteLeaks = Find<LastStatusPolicy.MuteLeaks>.From(GetType()).Attribute;
         MessageSchema = Find<MessageSchema>.From(GetType()).Attribute ?? new CompactMessageSchema();
     }
 
 
-    [ScopeState]
+    [ScopeStateItem]
     public string ActivityDomain { get; }
 
-    [ScopeState(nameof(Activity))]
+    [ScopeStateItem(nameof(Activity))]
     public string Name { get; }
 
-    public bool LastStatusMustBeVoid { get; }
+    public LastStatusPolicy.CanBeVoid? CanBeVoid { get; }
 
-    public bool LastStatusMustNotLeak { get; }
+    public LastStatusPolicy.MuteLeaks? MuteLeaks { get; }
 
     public MessageSchema MessageSchema { get; }
 }
@@ -421,19 +494,19 @@ public static class StatusRole
     public interface IAuto;
 }
 
-public interface IProvidesStateItems
+public interface IWithStateItems
 {
-    IEnumerable<(string Key, object Value)> States();
+    IEnumerable<KeyValuePair<string, object?>> StateItems();
 }
 
-public interface IMessageTemplateParts
+public interface IWithMessageParts
 {
-    IEnumerable<MessageTemplate> Parts(LogContext context);
+    IEnumerable<MessageTemplate> MessageParts(LogContext context);
 }
 
 public abstract class ActivityStatus<TActivity> where TActivity : Activity
 {
-    [ScopeState]
+    [ScopeStateItem]
     public virtual string Status => GetType().Name;
 
     public abstract LogLevel Level { get; }
@@ -445,26 +518,27 @@ public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> wher
 {
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-    public abstract class Halt : ActivityStatus<TActivity>, IMessageTemplateParts, StatusRole.ILast, StatusRole.IVeto, StatusRole.IUser
+    public abstract class Halt : ExplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IVeto, StatusRole.IUser
     {
         public override LogLevel Level => LogLevel.Warning;
 
+        [ScopeStateItem]
         public required string Reason { get; init; }
 
-        public IEnumerable<MessageTemplate> Parts(LogContext context)
+        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
         {
             yield return new("Reason: {Reason}", Reason);
         }
     }
 
     // core: This status applies when everything went according to plan.
-    public abstract class Okay : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    public abstract class Okay : ExplicitStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
     {
         public override LogLevel Level => LogLevel.Information;
     }
 
     // core: This status applies when an error occured.
-    public abstract class Fail : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    public abstract class Fail : ExplicitStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
     {
         public override LogLevel Level => LogLevel.Error;
     }
@@ -473,16 +547,16 @@ public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> wher
 internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
 {
     // note: This is the very first status. Its previous name was "First".
-    internal class Zero : ActivityStatus<TActivity>, StatusRole.IAuto
+    internal class Zero : ImplicitStatus<TActivity>, StatusRole.IAuto
     {
         public override LogLevel Level => LogLevel.Trace;
     }
 
-    internal class Busy(LogLevel level, MessageTemplate template) : ActivityStatus<TActivity>, StatusRole.IAuto, IMessageTemplateParts
+    internal class Busy(LogLevel level, MessageTemplate template) : ImplicitStatus<TActivity>, StatusRole.IAuto, IWithMessageParts
     {
         public override LogLevel Level => level;
 
-        public IEnumerable<MessageTemplate> Parts(LogContext context)
+        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
         {
             yield return template;
         }
@@ -493,25 +567,37 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
     }
 
     // core: This status applies when the caller does not care about the result.
-    internal class Void : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IAuto
+    internal class Void(LogLevel level) : ImplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IAuto
     {
-        public override LogLevel Level => LogLevel.Information;
-    }
+        public override LogLevel Level => level;
 
-    // core: This status applies when activity was not properly stopped.
-    internal class Last : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IAuto
-    {
-        public override LogLevel Level => LogLevel.Warning;
+        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        {
+            if (level == LogLevel.Information)
+            {
+                yield return new($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
+            }
+
+            if (level == LogLevel.Warning)
+            {
+                yield return new($"An explicit last status is missing; using this as fallback.");
+            }
+        }
     }
 
     // core: This status wraps another last status when it overflows.
-    internal sealed class Leak(ActivityStatus<TActivity> inner) : ActivityStatus<TActivity>, StatusRole.ILast, StatusRole.IAuto
+    internal sealed class Leak(ActivityStatus<TActivity> inner) : ImplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IAuto
     {
         public override LogLevel Level => LogLevel.Warning;
 
         public override string Status => nameof(Leak);
 
-        [ScopeState]
+        [ScopeStateItem]
         public string StatusLeaking => inner.Status;
+
+        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        {
+            yield return new("Leaking: [{StatusLeaking}]", StatusLeaking);
+        }
     }
 }
