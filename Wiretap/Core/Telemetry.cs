@@ -1,5 +1,4 @@
 ﻿using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -8,15 +7,6 @@ using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 
 namespace Wiretap.Core;
-
-public abstract class ActivityDomain
-{
-    // core: Logs about what the system is supposed to produce.
-    public abstract class Output : ActivityDomain;
-
-    // core: Logs about what allows the system able to produce.
-    public abstract class Engine : ActivityDomain;
-}
 
 public abstract class MessageRole
 {
@@ -43,13 +33,7 @@ public abstract class LastStatusPolicy : Attribute
     }
 }
 
-[AttributeUsage(AttributeTargets.Class)]
-public class ActivityDomainAttribute(string? name = null) : Attribute
-{
-    public string? Name { get; } = name;
-}
-
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
 public abstract class MessageSchema : Attribute
 {
     public abstract MessageTemplate From(LogContext context, IEnumerable<MessageTemplate> others);
@@ -61,7 +45,7 @@ public sealed class CompactMessageSchema(string separator = "; ") : MessageSchem
     {
         var root = new List<MessageTemplate>
         {
-            new("{Activity}[{Status}]", context.Activity, context.Status),
+            new("{ActivityRole}: {Activity}[{Status}]", context.ActivityRole, context.Activity, context.Status),
             new("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs)
         };
 
@@ -91,47 +75,9 @@ public class ScopeStateItem(string? name = null) : Attribute
 {
     public string? Name { get; } = name;
 
-    private static readonly ConcurrentDictionary<Type, (MemberInfo Member, ScopeStateItem State)[]> Cache = new();
-
     public static IEnumerable<KeyValuePair<string, object?>> From<T>(T source) where T : notnull
     {
-        var members = Cache.GetOrAdd(source.GetType(), Discover);
-
-        foreach (var (member, attr) in members)
-        {
-            var value = member switch
-            {
-                PropertyInfo property => property.GetValue(source),
-                FieldInfo field => field.GetValue(source),
-                _ => null
-            };
-
-            if (value is not null)
-            {
-                yield return new(attr.Name ?? member.Name, value);
-            }
-        }
-    }
-
-    private static (MemberInfo Member, ScopeStateItem State)[] Discover(Type type)
-    {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-
-        var properties =
-            from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<ScopeStateItem>()
-            where attr is not null
-            select ((MemberInfo)property, attr);
-
-        // core: Primary-constructor parameters become compiler-generated backing fields, so capture those too.
-
-        var fields =
-            from field in type.GetFields(flags)
-            let attr = field.GetCustomAttribute<ScopeStateItem>()
-            where attr is not null
-            select ((MemberInfo)field, attr);
-
-        return properties.Concat(fields).ToArray();
+        return GetScopeStatePropertyValues.From(source);
     }
 }
 
@@ -185,94 +131,45 @@ public static class GetScopeStatePropertyValues
     }
 }
 
-public static class Find<TAttribute> where TAttribute : Attribute
+public static class BuildActivityName
 {
-    private static readonly ConcurrentDictionary<Type, object> Cache = new();
+    private static readonly ConcurrentDictionary<Type, string> Cache = new();
 
-    public static AttributeMatch<TAttribute> From<TActivity>() => From(typeof(TActivity));
+    public static string For(Type type) => Cache.GetOrAdd(type, Discover);
 
-    public static AttributeMatch<TAttribute> From(Type type)
-    {
-        return (AttributeMatch<TAttribute>)Cache.GetOrAdd(type, Discover);
-    }
-
-    private static object Discover(Type type)
+    private static string Discover(Type type)
     {
         var parts = new Stack<Type>();
-        var types = new List<Type>();
+        var names = new Stack<string>();
 
         for (var current = type; current is not null; current = current.DeclaringType)
         {
             parts.Push(current);
-            types.Add(current);
-
-            // core: Collecting only the first attribute of each type.
-            if (current.GetCustomAttribute<TAttribute>(inherit: false) is { } attribute)
-            {
-                return new AttributeMatch<TAttribute>(attribute, types.ToArray(), parts.ToArray());
-            }
+            names.Push(current.Name);
         }
 
-        return new AttributeMatch<TAttribute>(null, types.ToArray(), parts.ToArray());
+        return string.Join(".", names);
     }
 }
 
-public sealed record AttributeMatch<TAttribute>(TAttribute? Attribute, IReadOnlyList<Type> Visited, IReadOnlyList<Type> Path) where TAttribute : Attribute
+public sealed class LoggerProxy<T>(ILogger inner, params KeyValuePair<string, object?>[] items) : ILogger<T>
 {
-    public int Depth => Visited.Count;
-}
+    private List<KeyValuePair<string, object?>> Items { get; } = [..items];
 
-public sealed class LoggerProxy<T>(ILogger inner, IEnumerable<KeyValuePair<string, object?>> items) : ILogger<T>
-{
-    private ILogger Inner { get; } = inner;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => inner.BeginScope(state);
 
-    private IEnumerable<KeyValuePair<string, object?>> Items => items;
-
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Inner.BeginScope(state);
-
-    public bool IsEnabled(LogLevel logLevel) => Inner.IsEnabled(logLevel);
+    public bool IsEnabled(LogLevel logLevel) => inner.IsEnabled(logLevel);
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        using (BeginScope(Items))
-        {
-            Inner.Log(logLevel, eventId, state, exception, formatter);
-        }
+        using var scope = Items.Count == 0 ? null : inner.BeginScope(Items);
+        inner.Log(logLevel, eventId, state, exception, formatter);
     }
 
-    public static ILogger<TOther> As<TOther>(ILogger<T> logger)
+    public LoggerProxy<T> WithStateItem(string key, object? value)
     {
-        if (typeof(T) == typeof(TOther)) throw new ArgumentException($"The code is trying to map the {typeof(T).Name} logger to the same type it already has. Either the type argument is wrong or the mapping is unnecessary.", nameof(TOther));
-
-        return
-            logger is LoggerProxy<T> proxy
-                ? new LoggerProxy<TOther>(proxy.Inner, proxy.Items)
-                : new LoggerProxy<TOther>(logger, []);
-    }
-
-    public static ILogger<T> With(ILogger<T> logger, params (string Key, object? Value)[] items)
-    {
-        if (items.Length == 0)
-        {
-            throw new ArgumentException($"The code is trying to extend the {typeof(T).Name} logger scope with no items. Either the call is unnecessary or the items array was not populated correctly.", nameof(items));
-        }
-
-        var keyValuePairs = items.Select(item => new KeyValuePair<string, object?>(item.Key, item.Value));
-
-        return
-            logger is LoggerProxy<T> proxy
-                ? new LoggerProxy<T>(proxy.Inner, proxy.Items.Concat(keyValuePairs))
-                : new LoggerProxy<T>(logger, keyValuePairs);
-    }
-}
-
-public static class LoggerProxyExtensions
-{
-    extension<T>(ILogger<T> logger)
-    {
-        public ILogger<TOther> MapAs<TOther>() => LoggerProxy<T>.As<TOther>(logger);
-
-        public ILogger<T> WithState(params (string Key, object? Value)[] items) => LoggerProxy<T>.With(logger, items);
+        Items.Add(new(key, value));
+        return this;
     }
 }
 
@@ -280,14 +177,14 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ILogger<ActivityDomain.Output> Output => logger.MapAs<T, ActivityDomain.Output>().WithState((nameof(ActivityDomain), nameof(ActivityDomain.Output)));
-        public ILogger<ActivityDomain.Engine> Engine => logger.MapAs<T, ActivityDomain.Engine>().WithState((nameof(ActivityDomain), nameof(ActivityDomain.Engine)));
+        public ILogger<ActivityRole.Core> Output => new LoggerProxy<ActivityRole.Core>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Core));
+        public ILogger<ActivityRole.Util> Engine => new LoggerProxy<ActivityRole.Util>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Util));
 
-        public ILogger<MessageRole.Data> Data => logger.MapAs<T, MessageRole.Data>().WithState((nameof(MessageRole), nameof(MessageRole.Data)));
-        public ILogger<MessageRole.Clue> Clue => logger.MapAs<T, MessageRole.Clue>().WithState((nameof(MessageRole), nameof(MessageRole.Clue)));
-        public ILogger<MessageRole.News> News => logger.MapAs<T, MessageRole.News>().WithState((nameof(MessageRole), nameof(MessageRole.News)));
+        public ILogger<MessageRole.Data> Data => new LoggerProxy<MessageRole.Data>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Data));
+        public ILogger<MessageRole.Clue> Clue => new LoggerProxy<MessageRole.Clue>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Clue));
+        public ILogger<MessageRole.News> News => new LoggerProxy<MessageRole.News>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.News));
 
-        public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
+        public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : ActivityRole
         {
             return ActivityScope<TActivity>.Start(logger, activity);
         }
@@ -297,20 +194,14 @@ public static class LoggerExtensions
 public record LogContext
 {
     public required string Activity { get; init; }
-
     public required string Status { get; init; }
-
-    public required string ActivityDomain { get; init; }
-
-    [ScopeStateItem]
+    public required string ActivityRole { get; init; }
     public required string MessageRole { get; init; }
-
-    [ScopeStateItem]
     public required long ElapsedMs { get; init; }
 }
 
 // core: This class may not be a logger, because it will circumvent the LogStatus constraints for statuses allowing to apply IStatusOnly to an IStatusWithDuration scope!
-public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : Activity
+public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : ActivityRole
 {
     // todo: set tags like "wiretap.activity" or "wiretap.channel"
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
@@ -356,16 +247,23 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
         {
             Activity = activity.Name,
             Status = status.Status,
-            ActivityDomain = activity.ActivityDomain,
+            ActivityRole = activity.Role,
             MessageRole = nameof(MessageRole.Data),
             ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
         };
 
         // meta: Using a list rather than Enumerable.Concat for performance reasons.
-        var stateItems = new List<KeyValuePair<string, object?>>(16);
+        var stateItems = new List<KeyValuePair<string, object?>>(16)
+        {
+            new(nameof(LogContext.Activity), context.Activity),
+            new(nameof(LogContext.ActivityRole), context.ActivityRole),
+            new(nameof(LogContext.Status), context.Status),
+            new(nameof(LogContext.MessageRole), context.MessageRole),
+            new(nameof(LogContext.ElapsedMs), context.ElapsedMs),
+        };
 
         stateItems.AddRange(GetScopeStatePropertyValues.From(activity));
-        stateItems.AddRange(GetScopeStatePropertyValues.From(context));
+        //stateItems.AddRange(GetScopeStatePropertyValues.From(context));
 
         if (activity is IWithStateItems activityItems)
         {
@@ -448,28 +346,22 @@ internal sealed class ActivityWrapper(string name) : IDisposable
 public record MessageTemplate([StructuredMessageTemplate] string? Template, params object?[] Args);
 
 // core: This is the base class for all activities.
-public abstract class Activity
+public abstract class ActivityRole
 {
-    protected Activity()
+    protected ActivityRole()
     {
-        var activityDomainMatch = Find<ActivityDomainAttribute>.From(GetType());
-        ActivityDomain = activityDomainMatch.Path.First().Name;
-
-        // note: The activity name begins by convention after the channel, so skip it.
-        Name = string.Join(".", activityDomainMatch.Path.Skip(1).Select(t => t.Name));
-
-        // todo: Collapse to a single property looking for the policy attribute!
-
-        CanBeVoid = Find<LastStatusPolicy.CanBeVoid>.From(GetType()).Attribute;
-        MuteLeaks = Find<LastStatusPolicy.MuteLeaks>.From(GetType()).Attribute;
-        MessageSchema = Find<MessageSchema>.From(GetType()).Attribute ?? new CompactMessageSchema();
+        Name = BuildActivityName.For(GetType());
+        CanBeVoid = GetType().GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true);
+        MuteLeaks = GetType().GetCustomAttribute<LastStatusPolicy.MuteLeaks>(inherit: true);
+        MessageSchema =
+            GetType().GetCustomAttribute<MessageSchema>(inherit: true)
+            ?? Assembly.GetExecutingAssembly().GetCustomAttribute<MessageSchema>()
+            ?? new CompactMessageSchema();
     }
 
 
-    [ScopeStateItem]
-    public string ActivityDomain { get; }
+    public abstract string Role { get; }
 
-    [ScopeStateItem(nameof(Activity))]
     public string Name { get; }
 
     public LastStatusPolicy.CanBeVoid? CanBeVoid { get; }
@@ -477,6 +369,16 @@ public abstract class Activity
     public LastStatusPolicy.MuteLeaks? MuteLeaks { get; }
 
     public MessageSchema MessageSchema { get; }
+
+    public abstract class Core : ActivityRole
+    {
+        public override string Role => nameof(ActivityRole.Core);
+    }
+
+    public abstract class Util : ActivityRole
+    {
+        public override string Role => nameof(ActivityRole.Util);
+    }
 }
 
 public static class StatusRole
@@ -504,9 +406,8 @@ public interface IWithMessageParts
     IEnumerable<MessageTemplate> MessageParts(LogContext context);
 }
 
-public abstract class ActivityStatus<TActivity> where TActivity : Activity
+public abstract class ActivityStatus<TActivity> where TActivity : ActivityRole
 {
-    [ScopeStateItem]
     public virtual string Status => GetType().Name;
 
     public abstract LogLevel Level { get; }
@@ -514,7 +415,7 @@ public abstract class ActivityStatus<TActivity> where TActivity : Activity
     public Exception? Exception { get; init; }
 }
 
-public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
+public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : ActivityRole
 {
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
@@ -544,7 +445,7 @@ public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> wher
     }
 }
 
-internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
+internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : ActivityRole
 {
     // note: This is the very first status. Its previous name was "First".
     internal class Zero : ImplicitStatus<TActivity>, StatusRole.IAuto
