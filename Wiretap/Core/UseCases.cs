@@ -2,7 +2,7 @@
 
 [assembly: CompactMessageSchema]
 
-namespace Wiretap.Core.Activities;
+namespace Wire;
 
 public abstract class Workflow
 {
@@ -26,7 +26,7 @@ public abstract class Workflow
 }
 
 [LastStatusPolicy.MuteLeaks]
-public class DeleteFile : ActivityRole.Util
+public class DeleteFile : ActivityRole.Buzz
 {
     [ScopeStateItem]
     public required string Path { get; init; }
@@ -39,13 +39,13 @@ public class DeleteFile : ActivityRole.Util
 }
 
 [LastStatusPolicy.CanBeVoid]
-public class CopyFile : ActivityRole.Util, IWithStateItems
+public class CopyFile : ActivityRole.Buzz, IWithStateItems
 {
     [ScopeStateItem]
     public required string Path { get; init; }
 
-    public IEnumerable<KeyValuePair<string, object?>> StateItems()
+    public void StateItems(AddStateItem add)
     {
-        yield return new("CustomItem", "CustomValue");
+        add("CustomItem", "CustomValue");
     }
 }

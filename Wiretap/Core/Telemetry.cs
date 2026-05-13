@@ -14,10 +14,10 @@ public abstract class MessageRole
     public abstract class Data;
 
     // core: Something nice to know about what is going on.
-    public abstract class Clue;
+    public abstract class Note;
 
     // core: Readable entries meant for the console.
-    public abstract class News;
+    public abstract class Echo;
 }
 
 [AttributeUsage(AttributeTargets.Class)]
@@ -36,26 +36,33 @@ public abstract class LastStatusPolicy : Attribute
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
 public abstract class MessageSchema : Attribute
 {
-    public abstract MessageTemplate From(LogContext context, IEnumerable<MessageTemplate> others);
+    public abstract MessageTemplate From<TActivity>(LogContext context, ActivityStatus<TActivity> status) where TActivity : ActivityRole;
 }
 
 public sealed class CompactMessageSchema(string separator = "; ") : MessageSchema
 {
-    public override MessageTemplate From(LogContext context, IEnumerable<MessageTemplate> others)
+    public override MessageTemplate From<TActivity>(LogContext context, ActivityStatus<TActivity> status)
     {
-        var root = new List<MessageTemplate>
+        return Compose(context, status as IWithMessageParts);
+    }
+
+    private MessageTemplate Compose(LogContext context, IWithMessageParts? messageParts)
+    {
+        var parts = new List<MessageTemplate>
         {
             new("{ActivityRole}: {Activity}[{Status}]", context.ActivityRole, context.Activity, context.Status),
             new("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs)
         };
 
-        // meta: Low performance.
-        //return root.Concat(others).Aggregate((c, n) => new($"{c.Template}{separator}{n.Template}", [..c.Args, ..n.Args]));
+        messageParts?.MessageParts(context, (t, a) => parts.Add(new(t, a)));
 
-        var msgs = new StringBuilder();
-        var args = new List<object?>();
+        // note: Low performance.
+         //return root.Concat(others).Aggregate((c, n) => new($"{c.Template}{separator}{n.Template}", [..c.Args, ..n.Args]));
 
-        foreach (var part in root.Concat(others))
+        var msgs = new StringBuilder(200);
+        var args = new List<object?>(16);
+
+        foreach (var part in parts)
         {
             if (msgs.Length > 0)
             {
@@ -75,9 +82,9 @@ public class ScopeStateItem(string? name = null) : Attribute
 {
     public string? Name { get; } = name;
 
-    public static IEnumerable<KeyValuePair<string, object?>> From<T>(T source) where T : notnull
+    public static void From<T>(T source, AddStateItem add) where T : notnull
     {
-        return GetScopeStatePropertyValues.From(source);
+        GetScopeStatePropertyValues.From(source, add);
     }
 }
 
@@ -85,17 +92,15 @@ public static class GetScopeStatePropertyValues
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
-    public static IEnumerable<KeyValuePair<string, object?>> From<T>(T source) where T : notnull
+    public static void From<T>(T source, AddStateItem add) where T : notnull
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
 
         foreach (var getter in getters)
         {
-            var value = getter.GetValue(source);
-
-            if (value is not null)
+            if (getter.GetValue(source) is {} value)
             {
-                yield return new(getter.Key, value);
+                add(getter.Key, value);
             }
         }
     }
@@ -139,12 +144,10 @@ public static class BuildActivityName
 
     private static string Discover(Type type)
     {
-        var parts = new Stack<Type>();
         var names = new Stack<string>();
 
         for (var current = type; current is not null; current = current.DeclaringType)
         {
-            parts.Push(current);
             names.Push(current.Name);
         }
 
@@ -177,12 +180,12 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ILogger<ActivityRole.Core> Output => new LoggerProxy<ActivityRole.Core>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Core));
-        public ILogger<ActivityRole.Util> Engine => new LoggerProxy<ActivityRole.Util>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Util));
+        public ILogger<ActivityRole.Core> Core => new LoggerProxy<ActivityRole.Core>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Core));
+        public ILogger<ActivityRole.Buzz> Buzz => new LoggerProxy<ActivityRole.Buzz>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Buzz));
 
         public ILogger<MessageRole.Data> Data => new LoggerProxy<MessageRole.Data>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Data));
-        public ILogger<MessageRole.Clue> Clue => new LoggerProxy<MessageRole.Clue>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Clue));
-        public ILogger<MessageRole.News> News => new LoggerProxy<MessageRole.News>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.News));
+        public ILogger<MessageRole.Note> Note => new LoggerProxy<MessageRole.Note>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Note));
+        public ILogger<MessageRole.Echo> Echo => new LoggerProxy<MessageRole.Echo>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Echo));
 
         public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : ActivityRole
         {
@@ -194,9 +197,9 @@ public static class LoggerExtensions
 public record LogContext
 {
     public required string Activity { get; init; }
-    public required string Status { get; init; }
     public required string ActivityRole { get; init; }
     public required string MessageRole { get; init; }
+    public required string Status { get; init; }
     public required long ElapsedMs { get; init; }
 }
 
@@ -262,28 +265,18 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             new(nameof(LogContext.ElapsedMs), context.ElapsedMs),
         };
 
-        stateItems.AddRange(GetScopeStatePropertyValues.From(activity));
-        //stateItems.AddRange(GetScopeStatePropertyValues.From(context));
+        var addStateItem = new AddStateItem((s, o) => stateItems.Add(new(s, o)));
 
-        if (activity is IWithStateItems activityItems)
-        {
-            stateItems.AddRange(activityItems.StateItems());
-        }
+        ScopeStateItem.From(activity, addStateItem);
+        ScopeStateItem.From(status, addStateItem);
 
-        if (status is IWithStateItems statusItems)
-        {
-            stateItems.AddRange(statusItems.StateItems());
-        }
-
-        stateItems.AddRange(ScopeStateItem.From(status));
+        (activity as IWithStateItems)?.StateItems(addStateItem);
+        (status as IWithStateItems)?.StateItems(addStateItem);
 
         using (logger.BeginScope(stateItems))
         {
-            var statusParts = (status as IWithMessageParts)?.MessageParts(context) ?? [];
-            var template = activity.MessageSchema.From(context, statusParts);
+            var template = activity.MessageSchema.From(context, status);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
-
-            //StatusHistory.Push((status, context));
         }
 
         return this;
@@ -355,7 +348,8 @@ public abstract class ActivityRole
         MuteLeaks = GetType().GetCustomAttribute<LastStatusPolicy.MuteLeaks>(inherit: true);
         MessageSchema =
             GetType().GetCustomAttribute<MessageSchema>(inherit: true)
-            ?? Assembly.GetExecutingAssembly().GetCustomAttribute<MessageSchema>()
+            ?? GetType().Assembly.GetCustomAttribute<MessageSchema>()
+            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageSchema>()
             ?? new CompactMessageSchema();
     }
 
@@ -372,12 +366,12 @@ public abstract class ActivityRole
 
     public abstract class Core : ActivityRole
     {
-        public override string Role => nameof(ActivityRole.Core);
+        public override string Role => nameof(Core);
     }
 
-    public abstract class Util : ActivityRole
+    public abstract class Buzz : ActivityRole
     {
-        public override string Role => nameof(ActivityRole.Util);
+        public override string Role => nameof(Buzz);
     }
 }
 
@@ -398,16 +392,22 @@ public static class StatusRole
 
 public interface IWithStateItems
 {
-    IEnumerable<KeyValuePair<string, object?>> StateItems();
+    void StateItems(AddStateItem add);
 }
 
 public interface IWithMessageParts
 {
-    IEnumerable<MessageTemplate> MessageParts(LogContext context);
+    void MessageParts(LogContext context, AppendMessagePart append);
 }
+
+public delegate void AppendMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
+
+public delegate void AddStateItem(string key, object? value);
 
 public abstract class ActivityStatus<TActivity> where TActivity : ActivityRole
 {
+    private static readonly ConcurrentDictionary<Type, Func<ActivityStatus<TActivity>>> Cache = new();
+
     public virtual string Status => GetType().Name;
 
     public abstract LogLevel Level { get; }
@@ -426,9 +426,9 @@ public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> wher
         [ScopeStateItem]
         public required string Reason { get; init; }
 
-        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        public void MessageParts(LogContext context, AppendMessagePart append)
         {
-            yield return new("Reason: {Reason}", Reason);
+            append("Reason: {Reason}", Reason);
         }
     }
 
@@ -457,9 +457,9 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
     {
         public override LogLevel Level => level;
 
-        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        public void MessageParts(LogContext context, AppendMessagePart append)
         {
-            yield return template;
+            append(template.Template, template.Args);
         }
 
         public static Busy Debug(MessageTemplate template) => new(LogLevel.Debug, template);
@@ -472,16 +472,16 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
     {
         public override LogLevel Level => level;
 
-        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        public void MessageParts(LogContext context, AppendMessagePart append)
         {
             if (level == LogLevel.Information)
             {
-                yield return new($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
+                append($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
             }
 
             if (level == LogLevel.Warning)
             {
-                yield return new($"An explicit last status is missing; using this as fallback.");
+                append($"An explicit last status is missing; using this as fallback.");
             }
         }
     }
@@ -496,9 +496,9 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
         [ScopeStateItem]
         public string StatusLeaking => inner.Status;
 
-        public IEnumerable<MessageTemplate> MessageParts(LogContext context)
+        public void MessageParts(LogContext context, AppendMessagePart append)
         {
-            yield return new("Leaking: [{StatusLeaking}]", StatusLeaking);
+            append("Leaking: [{StatusLeaking}]", StatusLeaking);
         }
     }
 }
