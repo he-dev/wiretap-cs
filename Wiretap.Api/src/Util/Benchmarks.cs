@@ -5,7 +5,6 @@ using System.IO;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
 using Wiretap.Core;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
@@ -164,14 +163,14 @@ public class Benchmarks
     [Benchmark]
     public void Wiretap_Okay()
     {
-        using var step = _logger.Begin(new Wire.Workflow.ExecuteStep.Now { StepIndex = 1 });
-        step.LogStatus(new Wire.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
+        using var step = _logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 });
+        step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
     }
 
     [Benchmark]
     public void Wiretap_VoidFallback()
     {
-        using var _ = _logger.Begin(new Wire.CopyFile { Path = "test.txt" });
+        using var _ = _logger.Begin(new Wires.CopyFile { Path = "test.txt" });
     }
 }
 

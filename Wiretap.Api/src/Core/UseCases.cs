@@ -1,8 +1,11 @@
 ﻿using Wiretap.Core;
+using Wiretap.Util;
+using Wiretap.Util.Skills;
 
-[assembly: CompactMessageSchema]
+[assembly: JoinMessageParts]
 
-namespace Wire;
+// ReSharper disable once CheckNamespace
+namespace Wires;
 
 public abstract class Workflow
 {
@@ -14,13 +17,13 @@ public abstract class Workflow
             [ScopeStateItem]
             public required int StepIndex { get; init; }
 
-            public sealed class Okay : ExplicitStatus<Now>.Okay
+            public sealed class Okay : ActivityStatus.Core<Now>.Okay
             {
                 [ScopeStateItem]
                 public required int ItemsProcessed { get; init; }
             }
 
-            public sealed class Fail : ExplicitStatus<Now>.Fail;
+            public sealed class Fail : ActivityStatus.Core<Now>.Fail;
         }
     }
 }
@@ -31,11 +34,11 @@ public class DeleteFile : Activity.Buzz
     [ScopeStateItem]
     public required string Path { get; init; }
 
-    public sealed class Halt : ExplicitStatus<DeleteFile>.Halt;
+    public sealed class Halt : ActivityStatus.Core<DeleteFile>.Halt;
 
-    public sealed class Okay : ExplicitStatus<DeleteFile>.Okay;
+    public sealed class Okay : ActivityStatus.Core<DeleteFile>.Okay;
 
-    public sealed class Fail : ExplicitStatus<DeleteFile>.Fail;
+    public sealed class Fail : ActivityStatus.Core<DeleteFile>.Fail;
 }
 
 [LastStatusPolicy.CanBeVoid]

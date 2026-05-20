@@ -16,18 +16,13 @@
     <Description>Contract-based logging extension.</Description>
     <PackageTags>logging;observability;telemetry</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+<!--    <PackageReadmeFile>README.md</PackageReadmeFile>-->
     <RepositoryUrl>https://github.com/he-dev/wiretap-dotnet</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageProjectUrl>https://github.com/he-dev/wiretap-dotnet</PackageProjectUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
-
-  <ItemGroup>
-    <Folder Include="Meta\" />
-    <Folder Include="Util\" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" Version="2025.2.4" />
