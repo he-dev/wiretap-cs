@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using BenchmarkDotNet.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Serilog;
 using Wiretap.Core;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace Wiretap.Api.Util;
 
@@ -15,16 +18,48 @@ public class Benchmarks
     private ILoggerFactory _factory = null!;
     private CountingLoggerProvider _provider = null!;
     private ILogger<Benchmarks> _logger = null!;
+    private string _logFilePath = null!;
+
+    // [GlobalSetup]
+    // public void Setup()
+    // {
+    //     _provider = new CountingLoggerProvider();
+    //     _factory = LoggerFactory.Create(builder =>
+    //     {
+    //         builder.ClearProviders();
+    //         builder.SetMinimumLevel(LogLevel.Trace);
+    //         builder.AddProvider(_provider);
+    //     });
+    //
+    //     _logger = _factory.CreateLogger<Benchmarks>();
+    // }
+    //
+    // [GlobalCleanup]
+    // public void Cleanup()
+    // {
+    //     _factory.Dispose();
+    // }
 
     [GlobalSetup]
     public void Setup()
     {
-        _provider = new CountingLoggerProvider();
+        _logFilePath = Path.Combine(Path.GetTempPath(), $"wiretap-bench-{Guid.NewGuid():N}.log");
+
+        var serilog = new LoggerConfiguration()
+            .MinimumLevel.Verbose()
+            .WriteTo.File(
+                path: _logFilePath,
+                rollingInterval: RollingInterval.Infinite,
+                buffered: true,
+                shared: false,
+                outputTemplate: "{Timestamp:O} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+            .CreateLogger();
+
         _factory = LoggerFactory.Create(builder =>
         {
             builder.ClearProviders();
             builder.SetMinimumLevel(LogLevel.Trace);
-            builder.AddProvider(_provider);
+            builder.AddSerilog(serilog, dispose: true);
         });
 
         _logger = _factory.CreateLogger<Benchmarks>();
@@ -34,6 +69,11 @@ public class Benchmarks
     public void Cleanup()
     {
         _factory.Dispose();
+
+        if (File.Exists(_logFilePath))
+        {
+            File.Delete(_logFilePath);
+        }
     }
 
     [Benchmark(Baseline = true)]

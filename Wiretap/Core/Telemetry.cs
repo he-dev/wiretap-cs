@@ -33,47 +33,68 @@ public abstract class LastStatusPolicy : Attribute
     }
 }
 
+public readonly struct LastStatusPolicySet
+{
+    public LastStatusPolicy.CanBeVoid? CanBeVoid { get; init; }
+    public LastStatusPolicy.MuteLeaks? MuteLeaks { get; init; }
+}
+
+public delegate void AddStateItem(string key, object? value);
+
+public interface IWithStateItems
+{
+    void StateItems(AddStateItem add);
+}
+
+public delegate void AppendMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
+
+public interface IWithMessageParts
+{
+    void MessageParts(ActivityStatus.Context context, AppendMessagePart append);
+}
+
+// meta: This class is required to make the message template work with structured logging as the attribute can only be used on parameters.
+public record MessageTemplate([StructuredMessageTemplate] string? Template, params object?[] Args);
+
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
 public abstract class MessageSchema : Attribute
 {
-    public abstract MessageTemplate From<TActivity>(LogContext context, ActivityStatus<TActivity> status) where TActivity : ActivityRole;
+    public abstract MessageTemplate From(ActivityStatus.Context context, params IWithMessageParts?[] messageParts);
 }
 
-public sealed class CompactMessageSchema(string separator = "; ") : MessageSchema
+// core: Implements a message-schema where parts are joined by the specified separator.
+public sealed class CompactMessageSchema(string separator = "; ") : MessageSchema, IWithMessageParts
 {
-    public override MessageTemplate From<TActivity>(LogContext context, ActivityStatus<TActivity> status)
+    public override MessageTemplate From(ActivityStatus.Context context, params IWithMessageParts?[] messageParts)
     {
-        return Compose(context, status as IWithMessageParts);
-    }
+        // note: Does not use LINQ for better performance.
 
-    private MessageTemplate Compose(LogContext context, IWithMessageParts? messageParts)
-    {
-        var parts = new List<MessageTemplate>
-        {
-            new("{ActivityRole}: {Activity}[{Status}]", context.ActivityRole, context.Activity, context.Status),
-            new("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs)
-        };
+        var msgs = new StringBuilder(256);
+        var args = new List<object?>(32);
 
-        messageParts?.MessageParts(context, (t, a) => parts.Add(new(t, a)));
-
-        // note: Low performance.
-         //return root.Concat(others).Aggregate((c, n) => new($"{c.Template}{separator}{n.Template}", [..c.Args, ..n.Args]));
-
-        var msgs = new StringBuilder(200);
-        var args = new List<object?>(16);
-
-        foreach (var part in parts)
+        var append = new AppendMessagePart((t, a) =>
         {
             if (msgs.Length > 0)
             {
                 msgs.Append(separator);
             }
 
-            msgs.Append(part.Template);
-            args.AddRange(part.Args);
+            msgs.Append(t);
+            args.AddRange(a);
+        });
+
+        foreach (var item in messageParts)
+        {
+            item?.MessageParts(context, append);
         }
 
         return new(msgs.ToString(), args.ToArray());
+    }
+
+    public void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+    {
+        append("{ActivityRole}: {Activity}[{Status}]", context.ActivityRole, context.Activity, context.ActivityStatus);
+        append("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs);
     }
 }
 
@@ -98,7 +119,7 @@ public static class GetScopeStatePropertyValues
 
         foreach (var getter in getters)
         {
-            if (getter.GetValue(source) is {} value)
+            if (getter.GetValue(source) is { } value)
             {
                 add(getter.Key, value);
             }
@@ -180,60 +201,104 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ILogger<ActivityRole.Core> Core => new LoggerProxy<ActivityRole.Core>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Core));
-        public ILogger<ActivityRole.Buzz> Buzz => new LoggerProxy<ActivityRole.Buzz>(logger).WithStateItem(nameof(ActivityRole), nameof(ActivityRole.Buzz));
+        public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
+        {
+            return ActivityScope<TActivity>.Begin(logger, activity);
+        }
+
+        public ILogger<Activity.Core> Core => new LoggerProxy<Activity.Core>(logger).WithStateItem(nameof(Activity), nameof(Activity.Core));
+        public ILogger<Activity.Buzz> Buzz => new LoggerProxy<Activity.Buzz>(logger).WithStateItem(nameof(Activity), nameof(Activity.Buzz));
 
         public ILogger<MessageRole.Data> Data => new LoggerProxy<MessageRole.Data>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Data));
         public ILogger<MessageRole.Note> Note => new LoggerProxy<MessageRole.Note>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Note));
         public ILogger<MessageRole.Echo> Echo => new LoggerProxy<MessageRole.Echo>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Echo));
-
-        public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : ActivityRole
-        {
-            return ActivityScope<TActivity>.Start(logger, activity);
-        }
     }
 }
 
-public record LogContext
+// core: This is the base class for all activities.
+public abstract class Activity
 {
-    public required string Activity { get; init; }
-    public required string ActivityRole { get; init; }
-    public required string MessageRole { get; init; }
-    public required string Status { get; init; }
-    public required long ElapsedMs { get; init; }
+    protected Activity()
+    {
+        var type = GetType();
+        Name = BuildActivityName.For(type);
+        LastStatusPolicy = new()
+        {
+            CanBeVoid = type.GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true),
+            MuteLeaks = type.GetCustomAttribute<LastStatusPolicy.MuteLeaks>(inherit: true)
+        };
+        MessageSchema =
+            type.GetCustomAttribute<MessageSchema>(inherit: true)
+            ?? type.Assembly.GetCustomAttribute<MessageSchema>()
+            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageSchema>()
+            ?? new CompactMessageSchema();
+    }
+
+
+    public abstract string Role { get; }
+
+    public string Name { get; }
+
+    public LastStatusPolicySet LastStatusPolicy { get; }
+
+    public MessageSchema MessageSchema { get; }
+
+    public abstract class Core : Activity
+    {
+        public override string Role => nameof(Core);
+    }
+
+    public abstract class Buzz : Activity
+    {
+        public override string Role => nameof(Buzz);
+    }
 }
 
 // core: This class may not be a logger, because it will circumvent the LogStatus constraints for statuses allowing to apply IStatusOnly to an IStatusWithDuration scope!
-public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : ActivityRole
+public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : Activity
 {
-    // todo: set tags like "wiretap.activity" or "wiretap.channel"
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
 
     private Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
 
-    // util: Track all status for debugging. It is for free.
-    //public Stack<(ActivityStatus<TActivity> Status, LogContext Context)> StatusHistory { get; } = new();
-
     private bool ContainsLastStatus { get; set; }
 
-    public ActivityScope<TActivity> LogStatus(ExplicitStatus<TActivity> status)
+    public TimeSpan Elapsed => Stopwatch.Elapsed;
+
+    public static ActivityScope<TActivity> Begin<T>(ILogger<T> logger, TActivity activity)
+    {
+        var activityScope = new ActivityScope<TActivity>(logger, activity);
+        activityScope.LogStatus(new ImplicitStatus<TActivity>.Zero());
+        return activityScope;
+    }
+
+    public void LogStatus(ExplicitStatus<TActivity> status)
     {
         // core: Mute leaks except fails.
         if (status is StatusRole.ILast && ContainsLastStatus && status is not ExplicitStatus<TActivity>.Fail)
         {
-            if (activity.MuteLeaks is { } muteLeaks)
+            if (activity.LastStatusPolicy.MuteLeaks is { } muteLeaks)
             {
-                return muteLeaks.Silently ? this : LogStatus(new ImplicitStatus<TActivity>.Leak(status));
+                if (muteLeaks.Silently)
+                {
+                    // core: Do not log anything.
+                    return;
+                }
+
+                // core: Log the leak.
+                LogStatus(new ImplicitStatus<TActivity>.Leak(status));
+
+                return;
             }
 
-            throw new InvalidOperationException($"The code is trying to log '{status.Status}' as another last status for the '{activity.Name}' activity, but activities can have only one last status.");
+            throw new InvalidOperationException($"The code is trying to log '{status.Code}' as another last status for the '{activity.Name}' activity, but activities can have only one last status.");
         }
 
         // meta: Needs to cast so the right overload is called.
-        return LogStatus((ActivityStatus<TActivity>)status);
+        LogStatus((ActivityStatus<TActivity>)status);
     }
 
-    private ActivityScope<TActivity> LogStatus(ActivityStatus<TActivity> status)
+    private void LogStatus(ActivityStatus<TActivity> status)
     {
         if (status is StatusRole.ILast)
         {
@@ -246,66 +311,58 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             });
         }
 
-        var context = new LogContext
+        var context = new ActivityStatus.Context
         {
             Activity = activity.Name,
-            Status = status.Status,
+            ActivityStatus = status.Code,
             ActivityRole = activity.Role,
             MessageRole = nameof(MessageRole.Data),
             ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
         };
 
         // meta: Using a list rather than Enumerable.Concat for performance reasons.
-        var stateItems = new List<KeyValuePair<string, object?>>(16)
-        {
-            new(nameof(LogContext.Activity), context.Activity),
-            new(nameof(LogContext.ActivityRole), context.ActivityRole),
-            new(nameof(LogContext.Status), context.Status),
-            new(nameof(LogContext.MessageRole), context.MessageRole),
-            new(nameof(LogContext.ElapsedMs), context.ElapsedMs),
-        };
-
-        var addStateItem = new AddStateItem((s, o) => stateItems.Add(new(s, o)));
+        var stateItems = new List<KeyValuePair<string, object?>>(16);
+        var addStateItem = new AddStateItem((key, value) => stateItems.Add(new(key, value)));
 
         ScopeStateItem.From(activity, addStateItem);
         ScopeStateItem.From(status, addStateItem);
 
+        (context as IWithStateItems)?.StateItems(addStateItem);
         (activity as IWithStateItems)?.StateItems(addStateItem);
         (status as IWithStateItems)?.StateItems(addStateItem);
 
         using (logger.BeginScope(stateItems))
         {
-            var template = activity.MessageSchema.From(context, status);
+            var template = activity.MessageSchema.From(context, activity.MessageSchema as IWithMessageParts, status as IWithMessageParts);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
-
-        return this;
     }
 
     public void LogDebug([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(ImplicitStatus<TActivity>.Busy.Debug(new(message, args)));
+        LogStatus(new ImplicitStatus<TActivity>.Busy.Debug(message, args));
     }
 
     public void LogTrace([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(ImplicitStatus<TActivity>.Busy.Trace(new(message, args)));
+        LogStatus(new ImplicitStatus<TActivity>.Busy.Trace(message, args));
     }
 
     public void Dispose()
     {
         if (!ContainsLastStatus)
         {
-            var level = activity.CanBeVoid is null ? LogLevel.Warning : LogLevel.Information;
-            LogStatus(new ImplicitStatus<TActivity>.Void(level));
+            if (activity.LastStatusPolicy.CanBeVoid is null)
+            {
+                LogStatus(new ImplicitStatus<TActivity>.Void.Warn());
+            }
+            else
+            {
+                LogStatus(new ImplicitStatus<TActivity>.Void.Info());
+            }
         }
 
         ActivityWrapper.Dispose();
-    }
-
-    public static ActivityScope<TActivity> Start<T>(ILogger<T> logger, TActivity activity)
-    {
-        return new ActivityScope<TActivity>(logger, activity).LogStatus(new ImplicitStatus<TActivity>.Zero());
     }
 }
 
@@ -335,53 +392,13 @@ internal sealed class ActivityWrapper(string name) : IDisposable
     public void Dispose() => Inner?.Dispose();
 }
 
-// meta: This class is required to make the message template work with structured logging as the attribute can only be used on parameters.
-public record MessageTemplate([StructuredMessageTemplate] string? Template, params object?[] Args);
-
-// core: This is the base class for all activities.
-public abstract class ActivityRole
-{
-    protected ActivityRole()
-    {
-        Name = BuildActivityName.For(GetType());
-        CanBeVoid = GetType().GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true);
-        MuteLeaks = GetType().GetCustomAttribute<LastStatusPolicy.MuteLeaks>(inherit: true);
-        MessageSchema =
-            GetType().GetCustomAttribute<MessageSchema>(inherit: true)
-            ?? GetType().Assembly.GetCustomAttribute<MessageSchema>()
-            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageSchema>()
-            ?? new CompactMessageSchema();
-    }
-
-
-    public abstract string Role { get; }
-
-    public string Name { get; }
-
-    public LastStatusPolicy.CanBeVoid? CanBeVoid { get; }
-
-    public LastStatusPolicy.MuteLeaks? MuteLeaks { get; }
-
-    public MessageSchema MessageSchema { get; }
-
-    public abstract class Core : ActivityRole
-    {
-        public override string Role => nameof(Core);
-    }
-
-    public abstract class Buzz : ActivityRole
-    {
-        public override string Role => nameof(Buzz);
-    }
-}
-
 public static class StatusRole
 {
     // core: Marks statuses that veto the execution of an activity before reaching its normal completion path.
     public interface IVeto;
 
-    // core: Marks statuses that users can log.
-    public interface IUser;
+    // core: Marks statuses that track the activity's lifecycle.
+    public interface ICore;
 
     // core: Marks statuses that are last in the activity's lifecycle.
     public interface ILast;
@@ -390,62 +407,66 @@ public static class StatusRole
     public interface IAuto;
 }
 
-public interface IWithStateItems
+public abstract class ActivityStatus
 {
-    void StateItems(AddStateItem add);
-}
-
-public interface IWithMessageParts
-{
-    void MessageParts(LogContext context, AppendMessagePart append);
-}
-
-public delegate void AppendMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
-
-public delegate void AddStateItem(string key, object? value);
-
-public abstract class ActivityStatus<TActivity> where TActivity : ActivityRole
-{
-    private static readonly ConcurrentDictionary<Type, Func<ActivityStatus<TActivity>>> Cache = new();
-
-    public virtual string Status => GetType().Name;
+    public virtual string Code => GetType().Name;
 
     public abstract LogLevel Level { get; }
 
     public Exception? Exception { get; init; }
+
+    public record Context : IWithStateItems
+    {
+        public required string Activity { get; init; }
+        public required string ActivityRole { get; init; }
+        public required string ActivityStatus { get; init; }
+        public required string MessageRole { get; init; }
+        public required long ElapsedMs { get; init; }
+
+        public void StateItems(AddStateItem add)
+        {
+            add(nameof(Activity), Activity);
+            add(nameof(ActivityRole), ActivityRole);
+            add(nameof(ActivityStatus), ActivityStatus);
+            add(nameof(MessageRole), MessageRole);
+            add(nameof(ElapsedMs), ElapsedMs);
+        }
+    }
 }
 
-public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : ActivityRole
+// note: The generic parameter ensures type safety for activity scopes.
+public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity : Activity;
+
+public abstract class ExplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
 {
     // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
     // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-    public abstract class Halt : ExplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IVeto, StatusRole.IUser
+    public abstract class Halt : ExplicitStatus<TActivity>, IWithMessageParts, StatusRole.ICore, StatusRole.ILast, StatusRole.IVeto
     {
         public override LogLevel Level => LogLevel.Warning;
 
-        [ScopeStateItem]
         public required string Reason { get; init; }
 
-        public void MessageParts(LogContext context, AppendMessagePart append)
+        public void MessageParts(Context context, AppendMessagePart append)
         {
             append("Reason: {Reason}", Reason);
         }
     }
 
     // core: This status applies when everything went according to plan.
-    public abstract class Okay : ExplicitStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    public abstract class Okay : ExplicitStatus<TActivity>, StatusRole.ICore, StatusRole.ILast
     {
         public override LogLevel Level => LogLevel.Information;
     }
 
     // core: This status applies when an error occured.
-    public abstract class Fail : ExplicitStatus<TActivity>, StatusRole.ILast, StatusRole.IUser
+    public abstract class Fail : ExplicitStatus<TActivity>, StatusRole.ICore, StatusRole.ILast
     {
         public override LogLevel Level => LogLevel.Error;
     }
 }
 
-internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : ActivityRole
+internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
 {
     // note: This is the very first status. Its previous name was "First".
     internal class Zero : ImplicitStatus<TActivity>, StatusRole.IAuto
@@ -453,33 +474,42 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
         public override LogLevel Level => LogLevel.Trace;
     }
 
-    internal class Busy(LogLevel level, MessageTemplate template) : ImplicitStatus<TActivity>, StatusRole.IAuto, IWithMessageParts
+    internal abstract class Busy(LogLevel level, [StructuredMessageTemplate] string? message, object?[] args) : ImplicitStatus<TActivity>, StatusRole.IAuto, IWithMessageParts
     {
         public override LogLevel Level => level;
 
-        public void MessageParts(LogContext context, AppendMessagePart append)
+        public override string Code => nameof(Busy);
+
+        public void MessageParts(Context context, AppendMessagePart append)
         {
-            append(template.Template, template.Args);
+            append(message, args);
         }
 
-        public static Busy Debug(MessageTemplate template) => new(LogLevel.Debug, template);
+        public class Debug([StructuredMessageTemplate] string? message, object?[] args) : Busy(LogLevel.Debug, message, args);
 
-        public static Busy Trace(MessageTemplate template) => new(LogLevel.Trace, template);
+        public class Trace([StructuredMessageTemplate] string? message, object?[] args) : Busy(LogLevel.Trace, message, args);
     }
 
     // core: This status applies when the caller does not care about the result.
-    internal class Void(LogLevel level) : ImplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IAuto
+    internal abstract class Void(LogLevel level) : ImplicitStatus<TActivity>, IWithMessageParts, StatusRole.ILast, StatusRole.IAuto
     {
         public override LogLevel Level => level;
 
-        public void MessageParts(LogContext context, AppendMessagePart append)
+        public override string Code => nameof(Void);
+
+        public abstract void MessageParts(Context context, AppendMessagePart append);
+
+        internal class Info() : Void(LogLevel.Information)
         {
-            if (level == LogLevel.Information)
+            public override void MessageParts(Context context, AppendMessagePart append)
             {
                 append($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
             }
+        }
 
-            if (level == LogLevel.Warning)
+        internal class Warn() : Void(LogLevel.Warning)
+        {
+            public override void MessageParts(Context context, AppendMessagePart append)
             {
                 append($"An explicit last status is missing; using this as fallback.");
             }
@@ -491,12 +521,11 @@ internal abstract class ImplicitStatus<TActivity> : ActivityStatus<TActivity> wh
     {
         public override LogLevel Level => LogLevel.Warning;
 
-        public override string Status => nameof(Leak);
+        public override string Code => nameof(Leak);
 
-        [ScopeStateItem]
-        public string StatusLeaking => inner.Status;
+        public string StatusLeaking => inner.Code;
 
-        public void MessageParts(LogContext context, AppendMessagePart append)
+        public void MessageParts(Context context, AppendMessagePart append)
         {
             append("Leaking: [{StatusLeaking}]", StatusLeaking);
         }

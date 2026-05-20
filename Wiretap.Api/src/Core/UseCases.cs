@@ -7,7 +7,7 @@ namespace Wire;
 public abstract class Workflow
 {
     [LastStatusPolicy.MuteLeaks]
-    public class ExecuteStep : ActivityRole.Core
+    public class ExecuteStep : Activity.Core
     {
         public class Now : ExecuteStep
         {
@@ -26,7 +26,7 @@ public abstract class Workflow
 }
 
 [LastStatusPolicy.MuteLeaks]
-public class DeleteFile : ActivityRole.Buzz
+public class DeleteFile : Activity.Buzz
 {
     [ScopeStateItem]
     public required string Path { get; init; }
@@ -39,7 +39,7 @@ public class DeleteFile : ActivityRole.Buzz
 }
 
 [LastStatusPolicy.CanBeVoid]
-public class CopyFile : ActivityRole.Buzz, IWithStateItems
+public class CopyFile : Activity.Buzz, IWithStateItems
 {
     [ScopeStateItem]
     public required string Path { get; init; }
