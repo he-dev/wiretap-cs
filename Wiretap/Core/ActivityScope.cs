@@ -1,10 +1,8 @@
-﻿using System.Diagnostics;
-using JetBrains.Annotations;
+﻿using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
 using Wiretap.Util;
-using Wiretap.Util.Skills;
-using Activity = Wiretap.Util.Activity;
+using Wiretap.Util.Services;
 
 namespace Wiretap.Core;
 
@@ -12,7 +10,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
 {
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
 
-    private Stopwatch Stopwatch { get; } = Stopwatch.StartNew();
+    private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
 
     private bool ContainsLastStatus { get; set; }
 
@@ -73,20 +71,11 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDis
             ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
         };
 
-        // meta: Using a list rather than Enumerable.Concat for performance reasons.
-        var stateItems = new List<KeyValuePair<string, object?>>(32);
-        var addStateItem = new AddStateItem((key, value) => stateItems.Add(new(key, value)));
-
-        ScopeStateItem.From(activity, addStateItem);
-        ScopeStateItem.From(status, addStateItem);
-
-        (context as IWithStateItems)?.StateItems(addStateItem);
-        (activity as IWithStateItems)?.StateItems(addStateItem);
-        (status as IWithStateItems)?.StateItems(addStateItem);
+        var stateItems = GetStateItems.From(context, activity, status);
 
         using (logger.BeginScope(stateItems))
         {
-            var template = activity.JoinMessageParts.From(context, activity.MessageTemplatePrefix, status as IWithMessageParts);
+            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, status as IWithMessageParts);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }

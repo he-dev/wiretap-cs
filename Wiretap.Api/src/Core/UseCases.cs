@@ -1,8 +1,8 @@
 ﻿using Wiretap.Core;
 using Wiretap.Util;
-using Wiretap.Util.Skills;
+using Wiretap.Util.Services;
 
-[assembly: JoinMessageParts]
+[assembly: MessageTemplateSchema]
 
 // ReSharper disable once CheckNamespace
 namespace Wires;

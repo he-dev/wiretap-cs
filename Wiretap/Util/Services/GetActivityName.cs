@@ -2,7 +2,7 @@
 
 namespace Wiretap.Util.Services;
 
-public static class BuildActivityName
+public static class GetActivityName
 {
     private static readonly ConcurrentDictionary<Type, string> Cache = new();
 

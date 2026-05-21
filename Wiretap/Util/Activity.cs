@@ -1,6 +1,5 @@
 ﻿using System.Reflection;
 using Wiretap.Util.Services;
-using Wiretap.Util.Skills;
 
 namespace Wiretap.Util;
 
@@ -9,7 +8,7 @@ public abstract class Activity
     protected Activity()
     {
         var type = GetType();
-        Name = BuildActivityName.For(type);
+        Name = GetActivityName.For(type);
         LastStatusPolicy = new()
         {
             CanBeVoid = type.GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true),
@@ -22,11 +21,11 @@ public abstract class Activity
             ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageTemplatePrefix>()
             ?? new MessageTemplatePrefix();
 
-        JoinMessageParts =
-            type.GetCustomAttribute<JoinMessageParts>(inherit: true)
-            ?? type.Assembly.GetCustomAttribute<JoinMessageParts>()
-            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<JoinMessageParts>()
-            ?? new JoinMessageParts();
+        MessageTemplateSchema =
+            type.GetCustomAttribute<MessageTemplateSchema>(inherit: true)
+            ?? type.Assembly.GetCustomAttribute<MessageTemplateSchema>()
+            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageTemplateSchema>()
+            ?? new MessageTemplateSchema();
     }
 
 
@@ -38,7 +37,7 @@ public abstract class Activity
 
     public MessageTemplatePrefix? MessageTemplatePrefix { get; }
 
-    public JoinMessageParts JoinMessageParts { get; }
+    public MessageTemplateSchema MessageTemplateSchema { get; }
 
     public abstract class Core : Activity
     {

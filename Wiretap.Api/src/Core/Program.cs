@@ -40,7 +40,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var loopCount = args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase) ? 10_000 : 1 ;
 
-    for (int i = 0; i < loopCount; i++)
+    for (var i = 0; i < loopCount; i++)
     {
         using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
         {

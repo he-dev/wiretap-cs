@@ -1,10 +1,11 @@
 ﻿using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Skills;
+using Wiretap.Util.Services;
 
 namespace Wiretap.Util;
 
 // note: The generic parameter ensures type safety for activity scopes.
+// ReSharper disable once UnusedTypeParameter
 public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity : Activity;
 
 public abstract class ActivityStatus
