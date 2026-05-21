@@ -6,20 +6,45 @@ using Wiretap.Util.Services;
 
 namespace Wiretap.Core;
 
-public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : IDisposable where TActivity : Activity
+public abstract class ActivityScope
+{
+    protected System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
+
+    protected bool ContainsLastStatus { get; set; }
+
+    protected TimeSpan Elapsed => Stopwatch.Elapsed;
+
+    public static KeyValuePair<string, object?>[] CurrentItemTags()
+    {
+        if (System.Diagnostics.Activity.Current is { } current)
+        {
+            var activity = current.GetTagItem("Activity") as string;
+            var activityRole = current.GetTagItem("ActivityRole") as string;
+            var elapsedMs = current.GetTagItem("ElapsedMs") as Func<long>;
+            return
+            [
+                new(nameof(ActivityStatus.Context.Activity), activity),
+                new(nameof(ActivityStatus.Context.ActivityRole), activityRole),
+                new(nameof(ActivityStatus.Context.ActivityStatus), nameof(ActivityStatus.Auto<>.Busy)),
+                new(nameof(ActivityStatus.Context.ElapsedMs), elapsedMs?.Invoke()),
+            ];
+        }
+
+        return [];
+    }
+}
+
+public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope, IDisposable where TActivity : Activity
 {
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
-
-    private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
-
-    private bool ContainsLastStatus { get; set; }
-
-    public TimeSpan Elapsed => Stopwatch.Elapsed;
 
     public static ActivityScope<TActivity> Begin<T>(ILogger<T> logger, TActivity activity)
     {
         var activityScope = new ActivityScope<TActivity>(logger, activity);
-        activityScope.LogStatus(new ActivityStatus.Auto<TActivity>.Zero());
+        activityScope.ActivityWrapper.AddTag("Activity", activity.Name);
+        activityScope.ActivityWrapper.AddTag("ActivityRole", activity.Role);
+        activityScope.ActivityWrapper.AddTag("ElapsedMs", new Func<long>(() => (long)activityScope.Elapsed.TotalMilliseconds));
+        activityScope.LogStatus(new ActivityStatus.Auto<TActivity>.Zero((activity as IWithZeroStatus)?.ZeroStatusLevel));
         return activityScope;
     }
 

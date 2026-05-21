@@ -1,4 +1,4 @@
-﻿using Wiretap.Core;
+﻿using Microsoft.Extensions.Logging;
 using Wiretap.Util;
 using Wiretap.Util.Services;
 
@@ -10,7 +10,7 @@ namespace Wires;
 public abstract class Workflow
 {
     [LastStatusPolicy.MuteLeaks]
-    public class ExecuteStep : Activity.Core
+    public class ExecuteStep : Activity.Core, IWithZeroStatus
     {
         public class Now : ExecuteStep
         {

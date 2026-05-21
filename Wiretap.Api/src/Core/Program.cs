@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using BenchmarkDotNet.Running;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Wiretap.Api.Util;
 using Wiretap.Core;
+using Wiretap.Meta;
 
 if (args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase))
 {
@@ -35,6 +37,8 @@ builder
 
 var app = builder.Build();
 
+var listener = CreateActivityListener.Default();
+
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
@@ -44,7 +48,7 @@ using (var scope = app.Services.CreateScope())
     {
         using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
         {
-            logger.Core.Note.LogInformation("This step has a note.");
+            logger.Note.LogInformation("This step has a note.");
             step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
             //step.LogStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
         }
@@ -54,7 +58,7 @@ using (var scope = app.Services.CreateScope())
             // busy...
         }
 
-        logger.Buzz.Echo.LogDebug("This is a log text.");
+        logger.Echo.LogDebug("This is a log text.");
         //logger.LogStatus(new Engine.DeleteFile.Ok("test.txt"));
         //logger.Engine.LogStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
 
@@ -63,9 +67,9 @@ using (var scope = app.Services.CreateScope())
             // busy...
         }
 
-        logger.Buzz.Data.LogDebug("Logged without explicit last status.");
-        logger.Buzz.Echo.LogDebug("Logged without explicit last status.");
-        logger.Buzz.Note.LogDebug("Logged without explicit last status.");
+        logger.Data.LogDebug("Logged without explicit last status.");
+        logger.Echo.LogDebug("Logged without explicit last status.");
+        logger.Note.LogDebug("Logged without explicit last status.");
 
         using (var delete = logger.Begin(new Wires.DeleteFile { Path = "test.txt" }))
         {

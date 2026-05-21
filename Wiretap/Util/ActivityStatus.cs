@@ -66,9 +66,9 @@ public abstract class ActivityStatus
     internal abstract class Auto<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
     {
         // note: This is the very first status. Its previous name was "First".
-        internal class Zero : Auto<TActivity>
+        internal class Zero(LogLevel? level = null) : Auto<TActivity>
         {
-            public override LogLevel Level => LogLevel.Trace;
+            public override LogLevel Level => level ?? LogLevel.Trace;
         }
 
         internal abstract class Busy(LogLevel level, [StructuredMessageTemplate] string? message, object?[] args) : Auto<TActivity>, IWithMessageParts
@@ -128,4 +128,9 @@ public abstract class ActivityStatus
             }
         }
     }
+}
+
+public interface IWithZeroStatus
+{
+    public LogLevel ZeroStatusLevel => LogLevel.Information;
 }
