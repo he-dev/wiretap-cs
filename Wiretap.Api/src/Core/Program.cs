@@ -49,7 +49,7 @@ using (var scope = app.Services.CreateScope())
         using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
         {
             logger.Note.LogInformation("This step has a note.");
-            step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
+            step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 }, "This is the end of this step.");
             //step.LogStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
         }
 
@@ -74,10 +74,12 @@ using (var scope = app.Services.CreateScope())
         using (var delete = logger.Begin(new Wires.DeleteFile { Path = "test.txt" }))
         {
             delete.LogStatus(new Wires.DeleteFile.Halt { Reason = "File not found." });
+            delete.LogStatus(new Wires.DeleteFile.Halt());
             delete.LogStatus(new Wires.DeleteFile.Fail());
             delete.LogDebug("Logged at busy status.");
             delete.LogTrace("Logged at busy status.");
             delete.LogStatus(new Wires.DeleteFile.Okay());
+            delete.LogStatus(new Wires.DeleteFile.Halt.NotFound());
         }
     }
 }

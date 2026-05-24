@@ -48,7 +48,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
         return activityScope;
     }
 
-    public void LogStatus(ActivityStatus.Core<TActivity> status)
+    public void LogStatus(ActivityStatus.Core<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
     {
         // core: Mute leaks except fails.
         if (status is ActivityStatusRole.ILast && ContainsLastStatus && status is not ActivityStatus.Core<TActivity>.Fail)
@@ -62,7 +62,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
                 }
 
                 // core: Log the leak.
-                LogStatus(new ActivityStatus.Auto<TActivity>.Leak(status));
+                LogStatus(new ActivityStatus.Auto<TActivity>.Leak(status), new MessageTemplateSuffix(message, args));
 
                 return;
             }
@@ -71,10 +71,10 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
         }
 
         // meta: Needs to cast so the right overload is called.
-        LogStatus((ActivityStatus<TActivity>)status);
+        LogStatus((ActivityStatus<TActivity>)status, new MessageTemplateSuffix(message, args));
     }
 
-    private void LogStatus(ActivityStatus<TActivity> status)
+    private void LogStatus(ActivityStatus<TActivity> status, IWithMessageParts? suffix = null)
     {
         if (status is ActivityStatusRole.ILast)
         {
@@ -100,7 +100,7 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
 
         using (logger.BeginScope(stateItems))
         {
-            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, status as IWithMessageParts);
+            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, activity as IWithMessageParts, status as IWithMessageParts, suffix);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }

@@ -19,7 +19,7 @@ public abstract class Activity
             type.GetCustomAttribute<MessageTemplatePrefix>(inherit: true)
             ?? type.Assembly.GetCustomAttribute<MessageTemplatePrefix>()
             ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageTemplatePrefix>()
-            ?? new MessageTemplatePrefix();
+            ?? new MessageTemplatePrefix.Full();
 
         MessageTemplateSchema =
             type.GetCustomAttribute<MessageTemplateSchema>(inherit: true)

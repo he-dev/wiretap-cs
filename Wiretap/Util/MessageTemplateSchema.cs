@@ -17,9 +17,12 @@ public class MessageTemplateSchema(string separator = "; ") : Attribute
 
         var append = new AppendMessagePart((t, a) =>
         {
-            temp.Append(temp.Length > 0 ? separator : string.Empty);
-            temp.Append(t);
-            args.AddRange(a);
+            if (!string.IsNullOrEmpty(t))
+            {
+                temp.Append(temp.Length > 0 ? separator : string.Empty);
+                temp.Append(t);
+                args.AddRange(a);
+            }
         });
 
         foreach (var item in messageParts)
@@ -36,4 +39,36 @@ public delegate void AppendMessagePart([StructuredMessageTemplate] string? messa
 public interface IWithMessageParts
 {
     void MessageParts(ActivityStatus.Context context, AppendMessagePart append);
+}
+
+[PublicAPI]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
+public abstract class MessageTemplatePrefix : Attribute, IWithMessageParts
+{
+    public abstract void MessageParts(ActivityStatus.Context context, AppendMessagePart append);
+
+    public class Full : MessageTemplatePrefix
+    {
+        public override void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+        {
+            append("{ActivityRole}: {Activity}[{ActivityStatus}]", context.ActivityRole, context.Activity, context.ActivityStatus);
+            append("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs);
+        }
+    }
+
+    public class Compact : MessageTemplatePrefix
+    {
+        public override void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+        {
+            append("{ActivityRole}: {Activity}[{ActivityStatus}] in {ElapsedMs:N0} ms", context.ActivityRole, context.Activity, context.ActivityStatus, context.ElapsedMs);
+        }
+    }
+}
+
+public class MessageTemplateSuffix([StructuredMessageTemplate] string? message, params object?[] args) : IWithMessageParts
+{
+    public void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+    {
+        append(message, args);
+    }
 }

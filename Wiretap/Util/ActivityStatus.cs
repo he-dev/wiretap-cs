@@ -10,7 +10,8 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
 public abstract class ActivityStatus
 {
-    public virtual string Code => GetType().Name;
+    //public virtual string Code => GetType().Name;
+    public abstract string Code { get; }
 
     public abstract LogLevel Level { get; }
 
@@ -40,9 +41,11 @@ public abstract class ActivityStatus
         // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
         public abstract class Halt : Core<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
         {
+            public override string Code => nameof(Halt);
+
             public override LogLevel Level => LogLevel.Warning;
 
-            public required string Reason { get; init; }
+            public virtual string Reason { get; init; } = "Unspecified";
 
             public void MessageParts(Context context, AppendMessagePart append)
             {
@@ -53,13 +56,25 @@ public abstract class ActivityStatus
         // core: This status applies when everything went according to plan.
         public abstract class Okay : Core<TActivity>, ActivityStatusRole.ILast
         {
+            public override string Code => nameof(Okay);
+
             public override LogLevel Level => LogLevel.Information;
         }
 
         // core: This status applies when an error occured.
-        public abstract class Fail : Core<TActivity>, ActivityStatusRole.ILast
+        public abstract class Fail : Core<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
         {
+            public override string Code => nameof(Fail);
+
             public override LogLevel Level => LogLevel.Error;
+
+            public void MessageParts(Context context, AppendMessagePart append)
+            {
+                if (Exception is not null)
+                {
+                    append(Exception.Message);
+                }
+            }
         }
     }
 
@@ -68,6 +83,8 @@ public abstract class ActivityStatus
         // note: This is the very first status. Its previous name was "First".
         internal class Zero(LogLevel? level = null) : Auto<TActivity>
         {
+            public override string Code => nameof(Zero);
+
             public override LogLevel Level => level ?? LogLevel.Trace;
         }
 
@@ -124,6 +141,7 @@ public abstract class ActivityStatus
 
             public void MessageParts(Context context, AppendMessagePart append)
             {
+                (inner as IWithMessageParts)?.MessageParts(context, append);
                 append("Leaking: [{StatusLeaking}]", StatusLeaking);
             }
         }

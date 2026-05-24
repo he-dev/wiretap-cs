@@ -1,8 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
-using Wiretap.Util;
+﻿using Wiretap.Util;
 using Wiretap.Util.Services;
 
 [assembly: MessageTemplateSchema]
+[assembly: MessageTemplatePrefix.Compact]
 
 // ReSharper disable once CheckNamespace
 namespace Wires;
@@ -29,12 +29,23 @@ public abstract class Workflow
 }
 
 [LastStatusPolicy.MuteLeaks]
-public class DeleteFile : Activity.Buzz
+public class DeleteFile : Activity.Buzz, IWithMessageParts
 {
-    [ScopeStateItem]
+    //[ScopeStateItem]
     public required string Path { get; init; }
 
-    public sealed class Halt : ActivityStatus.Core<DeleteFile>.Halt;
+    public void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+    {
+        append("Path: '{Path}'", Path);
+    }
+
+    public class Halt : ActivityStatus.Core<DeleteFile>.Halt
+    {
+        public sealed class NotFound : DeleteFile.Halt
+        {
+            public override string Reason { get; init; } = "File not found";
+        }
+    }
 
     public sealed class Okay : ActivityStatus.Core<DeleteFile>.Okay;
 
