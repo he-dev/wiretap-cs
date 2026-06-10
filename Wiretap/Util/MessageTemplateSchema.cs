@@ -1,5 +1,6 @@
-﻿using System.Text;
+using System.Text;
 using JetBrains.Annotations;
+using Wiretap.Util.Services;
 
 namespace Wiretap.Util;
 
@@ -8,14 +9,14 @@ namespace Wiretap.Util;
 public class MessageTemplateSchema(string separator = "; ") : Attribute
 {
     // core: Implements a message-schema where parts are joined by the specified separator.
-    public virtual MessageTemplate From(ActivityStatus.Context context, params IWithMessageParts?[] messageParts)
+    public virtual MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds)
     {
         // note: Does not use LINQ for better performance.
 
         var temp = new StringBuilder(256);
         var args = new List<object?>(32);
 
-        var append = new AppendMessagePart((t, a) =>
+        var push = new PushMessagePart((t, a) =>
         {
             if (!string.IsNullOrEmpty(t))
             {
@@ -25,50 +26,47 @@ public class MessageTemplateSchema(string separator = "; ") : Attribute
             }
         });
 
-        foreach (var item in messageParts)
-        {
-            item?.MessageParts(context, append);
-        }
+        GetMessageParts.From(context, push, messagePartFeeds);
 
         return new(temp.ToString(), args.ToArray());
     }
 }
 
-public delegate void AppendMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
+public delegate void PushMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
 
-public interface IWithMessageParts
+public interface IMessagePartFeed
 {
-    void MessageParts(ActivityStatus.Context context, AppendMessagePart append);
+    void MessageParts(ActivityStatus.Context context, PushMessagePart push);
 }
 
 [PublicAPI]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
-public abstract class MessageTemplatePrefix : Attribute, IWithMessageParts
+public abstract class MessageTemplatePrefix : Attribute, IMessagePartFeed
 {
-    public abstract void MessageParts(ActivityStatus.Context context, AppendMessagePart append);
+    public abstract void MessageParts(ActivityStatus.Context context, PushMessagePart push);
 
     public class Full : MessageTemplatePrefix
     {
-        public override void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+        public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
         {
-            append("{ActivityRole}: {Activity}[{ActivityStatus}]", context.ActivityRole, context.Activity, context.ActivityStatus);
-            append("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs);
+            push("{ActivityRole}: {Activity}[{ActivityStatus}]", context.ActivityRole, context.Activity, context.ActivityStatus);
+            push("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs);
         }
     }
 
     public class Compact : MessageTemplatePrefix
     {
-        public override void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+        public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
         {
-            append("{ActivityRole}: {Activity}[{ActivityStatus}] in {ElapsedMs:N0} ms", context.ActivityRole, context.Activity, context.ActivityStatus, context.ElapsedMs);
+            push("{ActivityRole}: {Activity}[{ActivityStatus}] in {ElapsedMs:N0} ms", context.ActivityRole, context.Activity, context.ActivityStatus, context.ElapsedMs);
         }
     }
 }
 
-public class MessageTemplateSuffix([StructuredMessageTemplate] string? message, params object?[] args) : IWithMessageParts
+public class MessageTemplateSuffix([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
 {
-    public void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
+    public void MessageParts(ActivityStatus.Context context, PushMessagePart push)
     {
-        append(message, args);
+        push(message, args);
     }
 }

@@ -81,21 +81,21 @@ public class Benchmarks
         var activity = "Workflow.ExecuteStep.Now";
         var stepIndex = 1;
 
-        var stateZero = new List<KeyValuePair<string, object?>>
+        var stateReady = new List<KeyValuePair<string, object?>>
         {
             new("Activity", activity),
             new("ActivityRole", "Core"),
-            new("Status", "Zero"),
+            new("Status", "Ready"),
             new("MessageRole", "Data"),
             new("ElapsedMs", 0L),
             new("StepIndex", stepIndex)
         };
 
-        using (_logger.BeginScope(stateZero))
+        using (_logger.BeginScope(stateReady))
         {
-            _logger.LogTrace(
+            _logger.LogInformation(
                 "ActivityRole: {ActivityRole}; Activity: {Activity}[{Status}]; Elapsed: {ElapsedMs} ms",
-                "Core", activity, "Zero", 0L);
+                "Core", activity, "Ready", 0L);
         }
 
         var stateOkay = new List<KeyValuePair<string, object?>>
@@ -122,22 +122,22 @@ public class Benchmarks
     {
         var activity = "CopyFile";
 
-        var stateZero = new List<KeyValuePair<string, object?>>
+        var stateReady = new List<KeyValuePair<string, object?>>
         {
             new("Activity", activity),
             new("ActivityRole", "Buzz"),
-            new("Status", "Zero"),
+            new("Status", "Ready"),
             new("MessageRole", "Data"),
             new("ElapsedMs", 0L),
             new("Path", "test.txt"),
             new("CustomItem", "CustomValue")
         };
 
-        using (_logger.BeginScope(stateZero))
+        using (_logger.BeginScope(stateReady))
         {
-            _logger.LogTrace(
+            _logger.LogInformation(
                 "ActivityRole: {ActivityRole}; Activity: {Activity}[{Status}]; Elapsed: {ElapsedMs} ms",
-                "Buzz", activity, "Zero", 0L);
+                "Buzz", activity, "Ready", 0L);
         }
 
         var stateVoid = new List<KeyValuePair<string, object?>>
@@ -153,10 +153,10 @@ public class Benchmarks
 
         using (_logger.BeginScope(stateVoid))
         {
-            _logger.LogInformation(
+            _logger.LogWarning(
                 "ActivityRole: {ActivityRole}; Activity: {Activity}[{Status}]; Elapsed: {ElapsedMs} ms; {Message}",
                 "Buzz", activity, "Void", 0L,
-                "CanBeVoid policy is set; it allows omitting an explicit last status.");
+                "An explicit last status is missing; using this as fallback.");
         }
     }
 
@@ -164,7 +164,7 @@ public class Benchmarks
     public void Wiretap_Okay()
     {
         using var step = _logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 });
-        step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
+        step.SetStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
     }
 
     [Benchmark]

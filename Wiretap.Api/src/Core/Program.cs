@@ -49,8 +49,8 @@ using (var scope = app.Services.CreateScope())
         using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
         {
             logger.Note.LogInformation("This step has a note.");
-            step.LogStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 }, "This is the end of this step.");
-            //step.LogStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
+            step.SetStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 }, "This is the end of this step.");
+            //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
         }
 
         using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 2 }))
@@ -59,8 +59,8 @@ using (var scope = app.Services.CreateScope())
         }
 
         logger.Echo.LogDebug("This is a log text.");
-        //logger.LogStatus(new Engine.DeleteFile.Ok("test.txt"));
-        //logger.Engine.LogStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
+        //logger.SetStatus(new Engine.DeleteFile.Ok("test.txt"));
+        //logger.Engine.SetStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
 
         using (logger.Begin(new Wires.CopyFile { Path = "test.txt" }))
         {
@@ -73,13 +73,13 @@ using (var scope = app.Services.CreateScope())
 
         using (var delete = logger.Begin(new Wires.DeleteFile { Path = "test.txt" }))
         {
-            delete.LogStatus(new Wires.DeleteFile.Halt { Reason = "File not found." });
-            delete.LogStatus(new Wires.DeleteFile.Halt());
-            delete.LogStatus(new Wires.DeleteFile.Fail());
+            delete.SetStatus(new Wires.DeleteFile.Halt { Reason = "File not found." });
+            delete.SetStatus(new Wires.DeleteFile.Halt());
+            delete.SetStatus(new Wires.DeleteFile.Fail());
             delete.LogDebug("Logged at busy status.");
             delete.LogTrace("Logged at busy status.");
-            delete.LogStatus(new Wires.DeleteFile.Okay());
-            delete.LogStatus(new Wires.DeleteFile.Halt.NotFound());
+            delete.SetStatus(new Wires.DeleteFile.Okay());
+            delete.SetStatus(new Wires.DeleteFile.Halt.NotFound());
         }
     }
 }

@@ -17,21 +17,27 @@ public abstract class ActivityStatus
 
     public Exception? Exception { get; init; }
 
-    public record Context : IWithStateItems
+    public record Context : IStateItemFeed
     {
         public required string Activity { get; init; }
         public required string ActivityRole { get; init; }
+        public required int ActivityDepth { get; init; }
+        public required string ActivityPath { get; init; }
+        public required string? ParentActivity { get; init; }
         public required string ActivityStatus { get; init; }
         public required string MessageRole { get; init; }
         public required long ElapsedMs { get; init; }
 
-        public void StateItems(AddStateItem add)
+        public void StateItems(PushStateItem push)
         {
-            add(nameof(Activity), Activity);
-            add(nameof(ActivityRole), ActivityRole);
-            add(nameof(ActivityStatus), ActivityStatus);
-            add(nameof(MessageRole), MessageRole);
-            add(nameof(ElapsedMs), ElapsedMs);
+            push(nameof(Activity), Activity);
+            push(nameof(ActivityRole), ActivityRole);
+            push(nameof(ActivityDepth), ActivityDepth);
+            push(nameof(ActivityPath), ActivityPath);
+            push(nameof(ParentActivity), ParentActivity);
+            push(nameof(ActivityStatus), ActivityStatus);
+            push(nameof(MessageRole), MessageRole);
+            push(nameof(ElapsedMs), ElapsedMs);
         }
     }
 
@@ -39,7 +45,7 @@ public abstract class ActivityStatus
     {
         // core: Used when an activity has started but deliberately stops before its normal completion path because a known,
         // non-exceptional condition makes continuation invalid, impossible, or no longer meaningful.
-        public abstract class Halt : Core<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
+        public abstract class Halt : Core<TActivity>, IMessagePartFeed, ActivityStatusRole.ILast
         {
             public override string Code => nameof(Halt);
 
@@ -47,9 +53,9 @@ public abstract class ActivityStatus
 
             public virtual string Reason { get; init; } = "Unspecified";
 
-            public void MessageParts(Context context, AppendMessagePart append)
+            public void MessageParts(Context context, PushMessagePart push)
             {
-                append("Reason: {Reason}", Reason);
+                push("Reason: {Reason}", Reason);
             }
         }
 
@@ -61,18 +67,26 @@ public abstract class ActivityStatus
             public override LogLevel Level => LogLevel.Information;
         }
 
+        // core: This status applies when the activity intentionally did nothing.
+        public abstract class Noop : Core<TActivity>, ActivityStatusRole.ILast
+        {
+            public override string Code => nameof(Noop);
+
+            public override LogLevel Level => LogLevel.Information;
+        }
+
         // core: This status applies when an error occured.
-        public abstract class Fail : Core<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
+        public abstract class Fail : Core<TActivity>, IMessagePartFeed, ActivityStatusRole.ILast
         {
             public override string Code => nameof(Fail);
 
             public override LogLevel Level => LogLevel.Error;
 
-            public void MessageParts(Context context, AppendMessagePart append)
+            public void MessageParts(Context context, PushMessagePart push)
             {
                 if (Exception is not null)
                 {
-                    append(Exception.Message);
+                    push(Exception.Message);
                 }
             }
         }
@@ -80,23 +94,23 @@ public abstract class ActivityStatus
 
     internal abstract class Auto<TActivity> : ActivityStatus<TActivity> where TActivity : Activity
     {
-        // note: This is the very first status. Its previous name was "First".
-        internal class Zero(LogLevel? level = null) : Auto<TActivity>
+        // core: The first status emitted by an activity scope when it is entered.
+        internal class Ready(LogLevel? level = null) : Auto<TActivity>
         {
-            public override string Code => nameof(Zero);
+            public override string Code => nameof(Ready);
 
-            public override LogLevel Level => level ?? LogLevel.Trace;
+            public override LogLevel Level => level ?? LogLevel.Information;
         }
 
-        internal abstract class Busy(LogLevel level, [StructuredMessageTemplate] string? message, object?[] args) : Auto<TActivity>, IWithMessageParts
+        internal abstract class Busy(LogLevel level, [StructuredMessageTemplate] string? message, object?[] args) : Auto<TActivity>, IMessagePartFeed
         {
             public override LogLevel Level => level;
 
             public override string Code => nameof(Busy);
 
-            public void MessageParts(Context context, AppendMessagePart append)
+            public void MessageParts(Context context, PushMessagePart push)
             {
-                append(message, args);
+                push(message, args);
             }
 
             public class Debug([StructuredMessageTemplate] string? message, object?[] args) : Busy(LogLevel.Debug, message, args);
@@ -105,50 +119,35 @@ public abstract class ActivityStatus
         }
 
         // core: This status applies when the caller does not care about the result.
-        internal abstract class Void(LogLevel level) : Auto<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
+        internal abstract class Void(LogLevel level) : Auto<TActivity>, IMessagePartFeed, ActivityStatusRole.ILast
         {
             public override LogLevel Level => level;
 
             public override string Code => nameof(Void);
 
-            public abstract void MessageParts(Context context, AppendMessagePart append);
+            public abstract void MessageParts(Context context, PushMessagePart push);
 
             internal class Info() : Void(LogLevel.Information)
             {
-                public override void MessageParts(Context context, AppendMessagePart append)
+                public override void MessageParts(Context context, PushMessagePart push)
                 {
-                    append($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
+                    push($"{nameof(LastStatusPolicy.CanBeVoid)} policy is set; it allows omitting an explicit last status.");
                 }
             }
 
             internal class Warn() : Void(LogLevel.Warning)
             {
-                public override void MessageParts(Context context, AppendMessagePart append)
+                public override void MessageParts(Context context, PushMessagePart push)
                 {
-                    append($"An explicit last status is missing; using this as fallback.");
+                    push($"An explicit last status is missing; using this as fallback.");
                 }
             }
         }
 
-        // core: This status wraps another last status when it overflows.
-        internal sealed class Leak(ActivityStatus<TActivity> inner) : Auto<TActivity>, IWithMessageParts, ActivityStatusRole.ILast
-        {
-            public override LogLevel Level => LogLevel.Warning;
-
-            public override string Code => nameof(Leak);
-
-            public string StatusLeaking => inner.Code;
-
-            public void MessageParts(Context context, AppendMessagePart append)
-            {
-                (inner as IWithMessageParts)?.MessageParts(context, append);
-                append("Leaking: [{StatusLeaking}]", StatusLeaking);
-            }
-        }
     }
 }
 
-public interface IWithZeroStatus
+public interface IWithReadyStatus
 {
-    public LogLevel ZeroStatusLevel => LogLevel.Information;
+    public LogLevel ReadyStatusLevel => LogLevel.Information;
 }

@@ -8,25 +8,47 @@ namespace Wiretap.Core;
 
 public abstract class ActivityScope
 {
-    protected System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
+    private static readonly AsyncLocal<ActivityScope?> CurrentScope = new();
 
-    protected bool ContainsLastStatus { get; set; }
+    protected System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
 
     protected TimeSpan Elapsed => Stopwatch.Elapsed;
 
+    public static ActivityScope? Current => CurrentScope.Value;
+
+    public ActivityScope? Parent { get; private set; }
+
+    public int Depth => Parent?.Depth + 1 ?? 0;
+
+    public string Path => Parent is null ? ActivityName : $"{Parent.Path}/{ActivityName}";
+
+    public abstract string ActivityName { get; }
+
+    public abstract string ActivityRole { get; }
+
+    protected void Push()
+    {
+        (Parent, CurrentScope.Value) = (CurrentScope.Value, this);
+    }
+
+    protected void Pop()
+    {
+        (CurrentScope.Value, Parent) = (Parent, null);
+    }
+
     public static KeyValuePair<string, object?>[] CurrentItemTags()
     {
-        if (System.Diagnostics.Activity.Current is { } current)
+        if (Current is { } current)
         {
-            var activity = current.GetTagItem("Activity") as string;
-            var activityRole = current.GetTagItem("ActivityRole") as string;
-            var elapsedMs = current.GetTagItem("ElapsedMs") as Func<long>;
             return
             [
-                new(nameof(ActivityStatus.Context.Activity), activity),
-                new(nameof(ActivityStatus.Context.ActivityRole), activityRole),
+                new(nameof(ActivityStatus.Context.Activity), current.ActivityName),
+                new(nameof(ActivityStatus.Context.ActivityRole), current.ActivityRole),
+                new(nameof(ActivityStatus.Context.ActivityDepth), current.Depth),
+                new(nameof(ActivityStatus.Context.ActivityPath), current.Path),
+                new(nameof(ActivityStatus.Context.ParentActivity), current.Parent?.ActivityName),
                 new(nameof(ActivityStatus.Context.ActivityStatus), nameof(ActivityStatus.Auto<>.Busy)),
-                new(nameof(ActivityStatus.Context.ElapsedMs), elapsedMs?.Invoke()),
+                new(nameof(ActivityStatus.Context.ElapsedMs), (long)current.Elapsed.TotalMilliseconds),
             ];
         }
 
@@ -37,48 +59,66 @@ public abstract class ActivityScope
 public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope, IDisposable where TActivity : Activity
 {
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
+    private (ActivityStatus.Core<TActivity> Status, IMessagePartFeed? Suffix, long ElapsedMs)? _lastStatus;
+
+    public override string ActivityName => activity.Name;
+
+    public override string ActivityRole => activity.Role;
 
     public static ActivityScope<TActivity> Begin<T>(ILogger<T> logger, TActivity activity)
     {
         var activityScope = new ActivityScope<TActivity>(logger, activity);
+        activityScope.Push();
         activityScope.ActivityWrapper.AddTag("Activity", activity.Name);
         activityScope.ActivityWrapper.AddTag("ActivityRole", activity.Role);
         activityScope.ActivityWrapper.AddTag("ElapsedMs", new Func<long>(() => (long)activityScope.Elapsed.TotalMilliseconds));
-        activityScope.LogStatus(new ActivityStatus.Auto<TActivity>.Zero((activity as IWithZeroStatus)?.ZeroStatusLevel));
+        activityScope.LogStatus(new ActivityStatus.Auto<TActivity>.Ready((activity as IWithReadyStatus)?.ReadyStatusLevel));
         return activityScope;
     }
 
-    public void LogStatus(ActivityStatus.Core<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    public void SetStatus(ActivityStatus.Core<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
     {
-        // core: Mute leaks except fails.
-        if (status is ActivityStatusRole.ILast && ContainsLastStatus && status is not ActivityStatus.Core<TActivity>.Fail)
+        var suffix = new MessageTemplateSuffix(message, args);
+        var elapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds;
+
+        if (_lastStatus is { } lastStatus)
         {
-            if (activity.LastStatusPolicy.MuteLeaks is { } muteLeaks)
+            var context = CreateContext(status, elapsedMs);
+            var stateItems = GetStateItems.From(context, activity, status);
+
+            using (logger.BeginScope(stateItems))
             {
-                if (muteLeaks.Silently)
-                {
-                    // core: Do not log anything.
-                    return;
-                }
-
-                // core: Log the leak.
-                LogStatus(new ActivityStatus.Auto<TActivity>.Leak(status), new MessageTemplateSuffix(message, args));
-
-                return;
+                logger.LogWarning(
+                    "{Activity} status changed from [{PreviousStatus}] to [{CurrentStatus}] before scope exit.",
+                    activity.Name,
+                    lastStatus.Status.Code,
+                    status.Code
+                );
             }
-
-            throw new InvalidOperationException($"The code is trying to log '{status.Code}' as another last status for the '{activity.Name}' activity, but activities can have only one last status.");
         }
 
-        // meta: Needs to cast so the right overload is called.
-        LogStatus((ActivityStatus<TActivity>)status, new MessageTemplateSuffix(message, args));
+        _lastStatus = (status, suffix, elapsedMs);
     }
 
-    private void LogStatus(ActivityStatus<TActivity> status, IWithMessageParts? suffix = null)
+    private ActivityStatus.Context CreateContext(ActivityStatus<TActivity> status, long elapsedMs)
+    {
+        return new()
+        {
+            Activity = activity.Name,
+            ActivityStatus = status.Code,
+            ActivityRole = activity.Role,
+            ActivityDepth = Depth,
+            ActivityPath = Path,
+            ParentActivity = Parent?.ActivityName,
+            MessageRole = nameof(MessageRole.Data),
+            ElapsedMs = elapsedMs
+        };
+    }
+
+    private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, long? elapsedMs = null)
     {
         if (status is ActivityStatusRole.ILast)
         {
-            ContainsLastStatus = true;
             ActivityWrapper.Stop(isOk: status switch
             {
                 ActivityStatus.Core<TActivity>.Okay => true,
@@ -87,20 +127,13 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
             });
         }
 
-        var context = new ActivityStatus.Context
-        {
-            Activity = activity.Name,
-            ActivityStatus = status.Code,
-            ActivityRole = activity.Role,
-            MessageRole = nameof(MessageRole.Data),
-            ElapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds
-        };
+        var context = CreateContext(status, elapsedMs ?? (long)Stopwatch.Elapsed.TotalMilliseconds);
 
         var stateItems = GetStateItems.From(context, activity, status);
 
         using (logger.BeginScope(stateItems))
         {
-            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, activity as IWithMessageParts, status as IWithMessageParts, suffix);
+            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, activity as IMessagePartFeed, status as IMessagePartFeed, suffix);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }
@@ -117,18 +150,21 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
 
     public void Dispose()
     {
-        if (!ContainsLastStatus)
+        try
         {
-            if (activity.LastStatusPolicy.CanBeVoid is null)
+            if (_lastStatus is { } lastStatus)
             {
-                LogStatus(new ActivityStatus.Auto<TActivity>.Void.Warn());
+                LogStatus(lastStatus.Status, lastStatus.Suffix, lastStatus.ElapsedMs);
             }
             else
             {
-                LogStatus(new ActivityStatus.Auto<TActivity>.Void.Info());
+                LogStatus(new ActivityStatus.Auto<TActivity>.Void.Warn());
             }
         }
-
-        ActivityWrapper.Dispose();
+        finally
+        {
+            ActivityWrapper.Dispose();
+            Pop();
+        }
     }
 }

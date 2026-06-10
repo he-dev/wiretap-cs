@@ -11,8 +11,7 @@ public abstract class Activity
         Name = GetActivityName.For(type);
         LastStatusPolicy = new()
         {
-            CanBeVoid = type.GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true),
-            MuteLeaks = type.GetCustomAttribute<LastStatusPolicy.MuteLeaks>(inherit: true)
+            CanBeVoid = type.GetCustomAttribute<LastStatusPolicy.CanBeVoid>(inherit: true)
         };
 
         MessageTemplatePrefix =

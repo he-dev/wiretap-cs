@@ -9,8 +9,7 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    [LastStatusPolicy.MuteLeaks]
-    public class ExecuteStep : Activity.Core, IWithZeroStatus
+    public class ExecuteStep : Activity.Core, IWithReadyStatus
     {
         public class Now : ExecuteStep
         {
@@ -28,16 +27,10 @@ public abstract class Workflow
     }
 }
 
-[LastStatusPolicy.MuteLeaks]
-public class DeleteFile : Activity.Buzz, IWithMessageParts
+public class DeleteFile : Activity.Buzz
 {
-    //[ScopeStateItem]
+    [FeedToMessagePart]
     public required string Path { get; init; }
-
-    public void MessageParts(ActivityStatus.Context context, AppendMessagePart append)
-    {
-        append("Path: '{Path}'", Path);
-    }
 
     public class Halt : ActivityStatus.Core<DeleteFile>.Halt
     {
@@ -53,13 +46,13 @@ public class DeleteFile : Activity.Buzz, IWithMessageParts
 }
 
 [LastStatusPolicy.CanBeVoid]
-public class CopyFile : Activity.Buzz, IWithStateItems
+public class CopyFile : Activity.Buzz, IStateItemFeed
 {
     [ScopeStateItem]
     public required string Path { get; init; }
 
-    public void StateItems(AddStateItem add)
+    public void StateItems(PushStateItem push)
     {
-        add("CustomItem", "CustomValue");
+        push("CustomItem", "CustomValue");
     }
 }

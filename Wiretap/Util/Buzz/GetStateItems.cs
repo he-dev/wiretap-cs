@@ -4,11 +4,11 @@ using System.Reflection;
 
 namespace Wiretap.Util.Services;
 
-public delegate void AddStateItem(string key, object? value);
+public delegate void PushStateItem(string key, object? value);
 
-public interface IWithStateItems
+public interface IStateItemFeed
 {
-    void StateItems(AddStateItem add);
+    void StateItems(PushStateItem push);
 }
 
 public static class GetStateItems
@@ -20,29 +20,29 @@ public static class GetStateItems
         // note: Using a list rather than Enumerable.Concat for performance reasons.
 
         var stateItems = new List<KeyValuePair<string, object?>>(32);
-        var addStateItem = new AddStateItem((key, value) => stateItems.Add(new(key, value)));
+        var pushStateItem = new PushStateItem((key, value) => stateItems.Add(new(key, value)));
 
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(source, addStateItem);
-                ByAttribute(source, addStateItem);
+                ByInterface(source, pushStateItem);
+                ByAttribute(source, pushStateItem);
             }
         }
 
         return stateItems;
     }
 
-    private static void ByInterface(object source, AddStateItem add)
+    private static void ByInterface(object source, PushStateItem push)
     {
-        if (source is IWithStateItems withStateItems)
+        if (source is IStateItemFeed stateItemFeed)
         {
-            withStateItems.StateItems(add);
+            stateItemFeed.StateItems(push);
         }
     }
 
-    private static void ByAttribute<T>(T source, AddStateItem add) where T : notnull
+    private static void ByAttribute<T>(T source, PushStateItem push) where T : notnull
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
 
@@ -50,7 +50,7 @@ public static class GetStateItems
         {
             if (getter.GetValue(source) is { } value)
             {
-                add(getter.Key, value);
+                push(getter.Key, value);
             }
         }
     }
