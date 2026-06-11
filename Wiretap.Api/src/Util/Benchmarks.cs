@@ -84,7 +84,7 @@ public class Benchmarks
         var stateReady = new List<KeyValuePair<string, object?>>
         {
             new("Activity", activity),
-            new("ActivityRole", "Core"),
+            new("ActivityRole", "Buzz"),
             new("Status", "Ready"),
             new("MessageRole", "Data"),
             new("ElapsedMs", 0L),
@@ -95,13 +95,13 @@ public class Benchmarks
         {
             _logger.LogInformation(
                 "ActivityRole: {ActivityRole}; Activity: {Activity}[{Status}]; Elapsed: {ElapsedMs} ms",
-                "Core", activity, "Ready", 0L);
+                "Buzz", activity, "Ready", 0L);
         }
 
         var stateOkay = new List<KeyValuePair<string, object?>>
         {
             new("Activity", activity),
-            new("ActivityRole", "Core"),
+            new("ActivityRole", "Buzz"),
             new("Status", "Okay"),
             new("MessageRole", "Data"),
             new("ElapsedMs", 0L),
@@ -113,7 +113,7 @@ public class Benchmarks
         {
             _logger.LogInformation(
                 "ActivityRole: {ActivityRole}; Activity: {Activity}[{Status}]; Elapsed: {ElapsedMs} ms; ItemsProcessed: {ItemsProcessed}",
-                "Core", activity, "Okay", 0L, 100);
+                "Buzz", activity, "Okay", 0L, 100);
         }
     }
 
@@ -163,14 +163,14 @@ public class Benchmarks
     [Benchmark]
     public void Wiretap_Okay()
     {
-        using var step = _logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 });
+        using var step = _logger.BeginBuzz(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 });
         step.SetStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 });
     }
 
     [Benchmark]
     public void Wiretap_VoidFallback()
     {
-        using var _ = _logger.Begin(new Wires.CopyFile { Path = "test.txt" });
+        using var _ = _logger.BeginBuzz(new Wires.CopyFile { Path = "test.txt" });
     }
 }
 

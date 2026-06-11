@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Wiretap.Util;
 
 namespace Wiretap.Core;
@@ -7,16 +7,20 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public ActivityScope<TActivity> Begin<TActivity>(TActivity activity) where TActivity : Activity
+        public BuzzScope<TActivity> BeginBuzz<TActivity>(TActivity activity) where TActivity : Activity.Buzz
         {
-            return ActivityScope<TActivity>.Begin(logger, activity);
+            return BuzzScope<TActivity>.BeginBuzz(logger, activity);
         }
 
-        //public ILogger<Activity.Core> Core => new LoggerProxy<Activity.Core>(logger).WithStateItem(nameof(ActivityStatus.Context.ActivityRole), nameof(Activity.Core));
-        //public ILogger<Activity.Buzz> Buzz => new LoggerProxy<Activity.Buzz>(logger).WithStateItem(nameof(ActivityStatus.Context.ActivityRole), nameof(Activity.Buzz));
+        public void LogSnap<TActivity>(TActivity activity, ActivityStatus<TActivity> status) where TActivity : Activity.Snap
+        {
+            using var scope = new SnapScope<TActivity>(logger, activity);
+            scope.Log(status);
+        }
 
         public ILogger<MessageRole.Data> Data => new LoggerProxy<MessageRole.Data>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Data));
         public ILogger<MessageRole.Note> Note => new LoggerProxy<MessageRole.Note>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Note));
         public ILogger<MessageRole.Echo> Echo => new LoggerProxy<MessageRole.Echo>(logger).WithStateItem(nameof(MessageRole), nameof(MessageRole.Echo));
     }
+
 }

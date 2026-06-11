@@ -6,7 +6,7 @@ using Wiretap.Util.Services;
 
 namespace Wiretap.Core;
 
-public abstract class ActivityScope
+public abstract class ActivityScope : IMessagePartFeed
 {
     private static readonly AsyncLocal<ActivityScope?> CurrentScope = new();
 
@@ -26,14 +26,34 @@ public abstract class ActivityScope
 
     public abstract string ActivityRole { get; }
 
-    protected void Push()
+    public virtual void MessageParts(ActivityStatus.Context context, PushMessagePart push)
     {
-        (Parent, CurrentScope.Value) = (CurrentScope.Value, this);
+        push("{ActivityRole}: {Activity}[{ActivityStatus}]", context.ActivityRole, context.Activity, context.ActivityStatus);
     }
 
-    protected void Pop()
+    protected IDisposable EnterScope()
     {
-        (CurrentScope.Value, Parent) = (Parent, null);
+        var parent = CurrentScope.Value;
+        Parent = parent;
+        CurrentScope.Value = this;
+        return new AmbientScope(this, parent);
+    }
+
+    private sealed class AmbientScope(ActivityScope scope, ActivityScope? parent) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            CurrentScope.Value = parent;
+            scope.Parent = null;
+            _disposed = true;
+        }
     }
 
     public static KeyValuePair<string, object?>[] CurrentItemTags()
@@ -47,7 +67,6 @@ public abstract class ActivityScope
                 new(nameof(ActivityStatus.Context.ActivityDepth), current.Depth),
                 new(nameof(ActivityStatus.Context.ActivityPath), current.Path),
                 new(nameof(ActivityStatus.Context.ParentActivity), current.Parent?.ActivityName),
-                new(nameof(ActivityStatus.Context.ActivityStatus), nameof(ActivityStatus.Auto<>.Busy)),
                 new(nameof(ActivityStatus.Context.ElapsedMs), (long)current.Elapsed.TotalMilliseconds),
             ];
         }
@@ -56,27 +75,27 @@ public abstract class ActivityScope
     }
 }
 
-public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope, IDisposable where TActivity : Activity
+public class BuzzScope<TActivity>(ILogger logger, TActivity activity, Action<ActivityStatus<TActivity>, long>? onFinalStatus = null) : ActivityScope, IDisposable where TActivity : Activity.Buzz
 {
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
-    private (ActivityStatus.Core<TActivity> Status, IMessagePartFeed? Suffix, long ElapsedMs)? _lastStatus;
+    private BuzzBatch Batch { get; } = new();
+    private (ActivityStatus<TActivity> Status, IMessagePartFeed? Suffix, long ElapsedMs)? _lastStatus;
+    private IDisposable? _ambientScope;
 
     public override string ActivityName => activity.Name;
 
     public override string ActivityRole => activity.Role;
 
-    public static ActivityScope<TActivity> Begin<T>(ILogger<T> logger, TActivity activity)
+    public static BuzzScope<TActivity> BeginBuzz<T>(ILogger<T> logger, TActivity activity)
     {
-        var activityScope = new ActivityScope<TActivity>(logger, activity);
-        activityScope.Push();
-        activityScope.ActivityWrapper.AddTag("Activity", activity.Name);
-        activityScope.ActivityWrapper.AddTag("ActivityRole", activity.Role);
-        activityScope.ActivityWrapper.AddTag("ElapsedMs", new Func<long>(() => (long)activityScope.Elapsed.TotalMilliseconds));
-        activityScope.LogStatus(new ActivityStatus.Auto<TActivity>.Ready((activity as IWithReadyStatus)?.ReadyStatusLevel));
+        var activityScope = new BuzzScope<TActivity>(logger, activity);
+        activityScope.Enter();
+        activityScope.InitActivityWrapper();
+        activityScope.LogStatus(new ActivityStatus<TActivity>.Ready());
         return activityScope;
     }
 
-    public void SetStatus(ActivityStatus.Core<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    public void SetStatus(ActivityStatus<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
     {
         var suffix = new MessageTemplateSuffix(message, args);
         var elapsedMs = (long)Stopwatch.Elapsed.TotalMilliseconds;
@@ -100,6 +119,18 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
         _lastStatus = (status, suffix, elapsedMs);
     }
 
+    public BuzzItemScope<TItemActivity> BeginItem<TItemActivity>(TItemActivity activity) where TItemActivity : Activity.Buzz
+    {
+        return BuzzItemScope<TItemActivity>.BeginItem(logger, activity, Batch);
+    }
+
+    public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    {
+        base.MessageParts(context, push);
+        push("Elapsed: {ElapsedMs:N0} ms", context.ElapsedMs);
+        Batch.MessageParts(context, push);
+    }
+
     private ActivityStatus.Context CreateContext(ActivityStatus<TActivity> status, long elapsedMs)
     {
         return new()
@@ -115,37 +146,57 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
         };
     }
 
-    private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, long? elapsedMs = null)
+    protected void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, long? elapsedMs = null)
     {
         if (status is ActivityStatusRole.ILast)
         {
             ActivityWrapper.Stop(isOk: status switch
             {
-                ActivityStatus.Core<TActivity>.Okay => true,
-                ActivityStatus.Core<TActivity>.Fail => false,
+                ActivityStatus<TActivity>.Okay => true,
+                ActivityStatus<TActivity>.Fail => false,
                 _ => null
             });
         }
 
         var context = CreateContext(status, elapsedMs ?? (long)Stopwatch.Elapsed.TotalMilliseconds);
 
-        var stateItems = GetStateItems.From(context, activity, status);
+        var stateItems = GetStateItems.From(context, Batch, activity, status);
 
         using (logger.BeginScope(stateItems))
         {
-            var template = activity.MessageTemplateSchema.From(context, activity.MessageTemplatePrefix, activity as IMessagePartFeed, status as IMessagePartFeed, suffix);
+            var template = MessageTemplateSchema
+                .For(activity.GetType())
+                .From(context, this, activity as IMessagePartFeed, status as IMessagePartFeed, suffix);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }
 
+    protected void InitActivityWrapper()
+    {
+        ActivityWrapper.AddTag("Activity", activity.Name);
+        ActivityWrapper.AddTag("ActivityRole", activity.Role);
+        ActivityWrapper.AddTag("ElapsedMs", new Func<long>(() => (long)Elapsed.TotalMilliseconds));
+    }
+
+    protected void Enter()
+    {
+        _ambientScope = EnterScope();
+    }
+
     public void LogDebug([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(new ActivityStatus.Auto<TActivity>.Busy.Debug(message, args));
+        using (logger.BeginScope(CurrentItemTags()))
+        {
+            logger.LogDebug(message, args);
+        }
     }
 
     public void LogTrace([StructuredMessageTemplate] string? message, params object?[] args)
     {
-        LogStatus(new ActivityStatus.Auto<TActivity>.Busy.Trace(message, args));
+        using (logger.BeginScope(CurrentItemTags()))
+        {
+            logger.LogTrace(message, args);
+        }
     }
 
     public void Dispose()
@@ -155,16 +206,85 @@ public class ActivityScope<TActivity>(ILogger logger, TActivity activity) : Acti
             if (_lastStatus is { } lastStatus)
             {
                 LogStatus(lastStatus.Status, lastStatus.Suffix, lastStatus.ElapsedMs);
+                onFinalStatus?.Invoke(lastStatus.Status, lastStatus.ElapsedMs);
             }
             else
             {
-                LogStatus(new ActivityStatus.Auto<TActivity>.Void.Warn());
+                var status = new ActivityStatus<TActivity>.Void();
+                var durationMs = (long)Stopwatch.Elapsed.TotalMilliseconds;
+                LogStatus(status, elapsedMs: durationMs);
+                onFinalStatus?.Invoke(status, durationMs);
             }
         }
         finally
         {
             ActivityWrapper.Dispose();
-            Pop();
+            _ambientScope?.Dispose();
         }
+    }
+}
+
+public sealed class BuzzItemScope<TActivity> : BuzzScope<TActivity> where TActivity : Activity.Buzz
+{
+    private BuzzItemScope(ILogger logger, TActivity activity, BuzzBatch parentBatch) : base(logger, activity, parentBatch.Count) { }
+
+    internal static BuzzItemScope<TActivity> BeginItem(ILogger logger, TActivity activity, BuzzBatch batch)
+    {
+        var activityScope = new BuzzItemScope<TActivity>(logger, activity, batch);
+        activityScope.Enter();
+        activityScope.InitActivityWrapper();
+        activityScope.LogStatus(new ActivityStatus<TActivity>.Ready());
+        return activityScope;
+    }
+
+}
+
+public class SnapScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope, IDisposable where TActivity : Activity.Snap
+{
+    private IDisposable? _ambientScope;
+
+    public override string ActivityName => activity.Name;
+
+    public override string ActivityRole => activity.Role;
+
+    public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    {
+        base.MessageParts(context, push);
+        push("Elapsed: N/A");
+    }
+
+    private ActivityStatus.Context CreateContext(ActivityStatus<TActivity> status)
+    {
+        return new()
+        {
+            Activity = activity.Name,
+            ActivityStatus = status.Code,
+            ActivityRole = activity.Role,
+            ActivityDepth = Depth,
+            ActivityPath = Path,
+            ParentActivity = Parent?.ActivityName,
+            MessageRole = nameof(MessageRole.Data),
+            ElapsedMs = 0
+        };
+    }
+
+    internal void Log(ActivityStatus<TActivity> status)
+    {
+        _ambientScope = EnterScope();
+        var context = CreateContext(status);
+        var stateItems = GetStateItems.From(context, activity, status);
+
+        using (logger.BeginScope(stateItems))
+        {
+            var template = MessageTemplateSchema
+                .For(activity.GetType())
+                .From(context, this, activity as IMessagePartFeed, status as IMessagePartFeed);
+            logger.Log(status.Level, status.Exception, template.Template, template.Args);
+        }
+    }
+
+    public void Dispose()
+    {
+        _ambientScope?.Dispose();
     }
 }

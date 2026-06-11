@@ -46,40 +46,57 @@ using (var scope = app.Services.CreateScope())
 
     for (var i = 0; i < loopCount; i++)
     {
-        using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
+        using (var step = logger.BeginBuzz(new Wires.Workflow.ExecuteStep.Now { StepIndex = 1 }))
         {
             logger.Note.LogInformation("This step has a note.");
+            logger.LogSnap(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
+
+            using (var item = step.BeginItem(new Wires.DeleteFile { Path = "batch/a.txt" }))
+            {
+                item.SetStatus(new Wires.DeleteFile.Okay());
+            }
+
+            using (var item = step.BeginItem(new Wires.DeleteFile { Path = "batch/missing.txt" }))
+            {
+                item.SetStatus(new Wires.DeleteFile.Noop.NotFound());
+            }
+
+            using (var item = step.BeginItem(new Wires.DeleteFile { Path = "batch/error.txt" }))
+            {
+                item.SetStatus(new Wires.DeleteFile.Fail());
+            }
+
             step.SetStatus(new Wires.Workflow.ExecuteStep.Now.Okay { ItemsProcessed = 100 }, "This is the end of this step.");
             //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
         }
 
-        using (var step = logger.Begin(new Wires.Workflow.ExecuteStep.Now { StepIndex = 2 }))
+        using (var step = logger.BeginBuzz(new Wires.Workflow.ExecuteStep.Now { StepIndex = 2 }))
         {
-            // busy...
+            // work...
         }
 
         logger.Echo.LogDebug("This is a log text.");
         //logger.SetStatus(new Engine.DeleteFile.Ok("test.txt"));
         //logger.Engine.SetStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
 
-        using (logger.Begin(new Wires.CopyFile { Path = "test.txt" }))
+        using (logger.BeginBuzz(new Wires.CopyFile { Path = "test.txt" }))
         {
-            // busy...
+            // work...
         }
 
         logger.Data.LogDebug("Logged without explicit last status.");
         logger.Echo.LogDebug("Logged without explicit last status.");
         logger.Note.LogDebug("Logged without explicit last status.");
 
-        using (var delete = logger.Begin(new Wires.DeleteFile { Path = "test.txt" }))
+        using (var delete = logger.BeginBuzz(new Wires.DeleteFile { Path = "test.txt" }))
         {
-            delete.SetStatus(new Wires.DeleteFile.Halt { Reason = "File not found." });
-            delete.SetStatus(new Wires.DeleteFile.Halt());
+            delete.SetStatus(new Wires.DeleteFile.Noop { Reason = "File not found." });
+            delete.SetStatus(new Wires.DeleteFile.Noop());
             delete.SetStatus(new Wires.DeleteFile.Fail());
-            delete.LogDebug("Logged at busy status.");
-            delete.LogTrace("Logged at busy status.");
+            delete.LogDebug("Logged while the scope is active.");
+            delete.LogTrace("Logged while the scope is active.");
             delete.SetStatus(new Wires.DeleteFile.Okay());
-            delete.SetStatus(new Wires.DeleteFile.Halt.NotFound());
+            delete.SetStatus(new Wires.DeleteFile.Noop.NotFound());
         }
     }
 }
