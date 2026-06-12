@@ -1,9 +1,8 @@
 using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
-using JetBrains.Annotations;
 
-namespace Wiretap.Util.Services;
+namespace Wiretap.Util.Buzz;
 
 public static class GetMessageParts
 {

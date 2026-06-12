@@ -2,7 +2,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace Wiretap.Util.Services;
+namespace Wiretap.Util.Buzz;
 
 public delegate void PushStateItem(string key, object? value);
 

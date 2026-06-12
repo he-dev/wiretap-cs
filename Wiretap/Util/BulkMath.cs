@@ -1,9 +1,9 @@
 using System.Globalization;
-using Wiretap.Util.Services;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-internal sealed class BuzzBatch : IStateItemFeed, IMessagePartFeed
+public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
 {
     private readonly Dictionary<string, int> _statusCounts = new(StringComparer.Ordinal);
     private double _durationMean;
@@ -23,9 +23,10 @@ internal sealed class BuzzBatch : IStateItemFeed, IMessagePartFeed
 
     public double ThroughputS => DurationMs > 0 ? ItemCount / (DurationMs / 1000.0) : 0;
 
-    public void Count(ActivityStatus status, long durationMs)
+    public void Count(ActivityStatus status, TimeSpan duration)
     {
         ItemCount++;
+        var durationMs = (long)duration.TotalMilliseconds;
 
         var code = status.Code.ToLower(CultureInfo.InvariantCulture);
         _statusCounts[code] = _statusCounts.GetValueOrDefault(code) + 1;

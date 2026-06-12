@@ -2,27 +2,37 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
 using JetBrains.Annotations;
-using Wiretap.Util.Services;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
 [PublicAPI]
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
-public class MessageTemplateSchema(string separator = "; ") : Attribute
+public abstract class ComposeMessage : Attribute
 {
-    private static readonly ConcurrentDictionary<Type, MessageTemplateSchema> Cache = new();
+    public abstract MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds);
+}
 
-    public static MessageTemplateSchema For(Type activityType)
+public static class GetComposeMessage
+{
+    private static readonly ConcurrentDictionary<Type, ComposeMessage> Cache = new();
+
+    public static ComposeMessage FromAttributeOrDefault(Type activityType)
     {
         return Cache.GetOrAdd(activityType, type =>
-            type.GetCustomAttribute<MessageTemplateSchema>(inherit: true)
-            ?? type.Assembly.GetCustomAttribute<MessageTemplateSchema>()
-            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<MessageTemplateSchema>()
-            ?? new MessageTemplateSchema());
+            type.GetCustomAttribute<ComposeMessage>(inherit: true)
+            ?? type.Assembly.GetCustomAttribute<ComposeMessage>()
+            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<ComposeMessage>()
+            ?? Default);
     }
 
-    // core: Implements a message-schema where parts are joined by the specified separator.
-    public virtual MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds)
+    private static readonly ComposeMessage Default = new ComposeMessageByAppending();
+}
+
+// core: Implements a message schema where parts are appended in feed order and joined by a separator.
+public class ComposeMessageByAppending(string separator = "; ") : ComposeMessage
+{
+    public override MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds)
     {
         // note: Does not use LINQ for better performance.
 
@@ -52,7 +62,7 @@ public interface IMessagePartFeed
     void MessageParts(ActivityStatus.Context context, PushMessagePart push);
 }
 
-public class MessageTemplateSuffix([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
+public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
 {
     public void MessageParts(ActivityStatus.Context context, PushMessagePart push)
     {

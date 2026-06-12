@@ -1,7 +1,7 @@
 ﻿using Wiretap.Util;
-using Wiretap.Util.Services;
+using Wiretap.Util.Buzz;
 
-[assembly: MessageTemplateSchema]
+[assembly: ComposeMessageByAppending]
 
 // ReSharper disable once CheckNamespace
 namespace Wires;
@@ -49,6 +49,16 @@ public class DeleteFile : Activity.Buzz
     public sealed class Okay : ActivityStatus<DeleteFile>.Okay;
 
     public sealed class Fail : ActivityStatus<DeleteFile>.Fail;
+}
+
+public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(StatusLogPolicy.Last)
+{
+    [FeedToMessagePart]
+    public required string Path { get; init; }
+
+    public sealed class Okay : ActivityStatus<DeleteFolder>.Okay;
+
+    public sealed class Fail : ActivityStatus<DeleteFolder>.Fail;
 }
 
 public class ValidateRecord : Activity.Snap

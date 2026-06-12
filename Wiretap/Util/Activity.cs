@@ -1,6 +1,15 @@
-using Wiretap.Util.Services;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
+
+[Flags]
+public enum StatusLogPolicy
+{
+    None = 0x0,
+    First = 0x1,
+    Last = 0x2,
+    Both = First | Last,
+}
 
 public abstract class Activity
 {
@@ -9,17 +18,21 @@ public abstract class Activity
         Name = GetActivityName.For(GetType());
     }
 
-    public abstract string Role { get; }
-
     public string Name { get; }
 
-    public abstract class Buzz : Activity
+    public abstract class Buzz : Activity;
+
+    public abstract class Bulk : Buzz
     {
-        public override string Role => nameof(Buzz);
+        public abstract StatusLogPolicy StatusLogPolicy { get; }
     }
 
-    public abstract class Snap : Activity
+    public abstract class Bulk<TActivity, TItem>(StatusLogPolicy statusLogPolicy) : Bulk
+        where TActivity : Bulk<TActivity, TItem>
+        where TItem : Buzz
     {
-        public override string Role => nameof(Snap);
+        public override StatusLogPolicy StatusLogPolicy => statusLogPolicy;
     }
+
+    public abstract class Snap : Activity;
 }

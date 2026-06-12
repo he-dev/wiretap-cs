@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Services;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
@@ -72,24 +72,22 @@ public abstract class ActivityStatus
     public record Context : IStateItemFeed
     {
         public required string Activity { get; init; }
-        public required string ActivityRole { get; init; }
         public required int ActivityDepth { get; init; }
         public required string ActivityPath { get; init; }
         public required string? ParentActivity { get; init; }
         public required string ActivityStatus { get; init; }
         public required string MessageRole { get; init; }
-        public required long ElapsedMs { get; init; }
+        public required TimeSpan Duration { get; init; }
 
         public void StateItems(PushStateItem push)
         {
             push(nameof(Activity), Activity);
-            push(nameof(ActivityRole), ActivityRole);
             push(nameof(ActivityDepth), ActivityDepth);
             push(nameof(ActivityPath), ActivityPath);
             push(nameof(ParentActivity), ParentActivity);
             push(nameof(ActivityStatus), ActivityStatus);
             push(nameof(MessageRole), MessageRole);
-            push(nameof(ElapsedMs), ElapsedMs);
+            push(nameof(Duration), Duration);
         }
     }
 }

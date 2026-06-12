@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace Wiretap.Util.Services;
+namespace Wiretap.Util.Buzz;
 
 public static class GetActivityName
 {
