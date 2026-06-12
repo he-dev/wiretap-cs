@@ -1,4 +1,5 @@
-﻿using Wiretap.Util;
+using System.Collections.Generic;
+using Wiretap.Util;
 using Wiretap.Util.Buzz;
 
 [assembly: ComposeMessageByAppending]
@@ -35,9 +36,9 @@ public class DeleteFile : Activity.Buzz
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
-        public void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+        public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
         {
-            push("Reason: {Reason}", Reason);
+            push("Reason: {wiretap.activity.state.Reason}", Reason);
         }
 
         public sealed class NotFound : DeleteFile.Noop

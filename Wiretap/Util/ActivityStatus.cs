@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Wiretap.Util.Buzz;
-
 namespace Wiretap.Util;
 
 // core: The generic parameter ensures statuses can only be used with their activity contract.
@@ -8,7 +7,7 @@ namespace Wiretap.Util;
 public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity : Activity
 {
     // core: The first status emitted by a buzz when its scope is entered.
-    internal sealed class Ready : ActivityStatus<TActivity>
+    internal sealed class Ready : ActivityStatus<TActivity>, ActivityStatusRole.IFirst
     {
         public override string Code => nameof(Ready);
 
@@ -38,7 +37,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Error;
 
-        public void MessageParts(Context context, PushMessagePart push)
+        public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
         {
             if (Exception is not null)
             {
@@ -54,14 +53,14 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Warning;
 
-        public void MessageParts(Context context, PushMessagePart push)
+        public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
         {
             push("The activity scope exited without an explicit last status.");
         }
     }
 }
 
-public abstract class ActivityStatus
+public abstract class ActivityStatus : IStateItemFeed
 {
     public abstract string Code { get; }
 
@@ -69,25 +68,14 @@ public abstract class ActivityStatus
 
     public Exception? Exception { get; init; }
 
-    public record Context : IStateItemFeed
+    public virtual void StateItems(PushStateItem push)
     {
-        public required string Activity { get; init; }
-        public required int ActivityDepth { get; init; }
-        public required string ActivityPath { get; init; }
-        public required string? ParentActivity { get; init; }
-        public required string ActivityStatus { get; init; }
-        public required string MessageRole { get; init; }
-        public required TimeSpan Duration { get; init; }
-
-        public void StateItems(PushStateItem push)
+        push("wiretap.activity.status.code", Code);
+        push("wiretap.activity.status.role", this switch
         {
-            push(nameof(Activity), Activity);
-            push(nameof(ActivityDepth), ActivityDepth);
-            push(nameof(ActivityPath), ActivityPath);
-            push(nameof(ParentActivity), ParentActivity);
-            push(nameof(ActivityStatus), ActivityStatus);
-            push(nameof(MessageRole), MessageRole);
-            push(nameof(Duration), Duration);
-        }
+            ActivityStatusRole.IFirst => "first",
+            ActivityStatusRole.ILast => "last",
+            _ => null
+        });
     }
 }

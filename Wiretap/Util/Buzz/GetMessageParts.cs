@@ -6,25 +6,26 @@ namespace Wiretap.Util.Buzz;
 
 public static class GetMessageParts
 {
+    private const string StatePrefix = "wiretap.activity.state";
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
-    public static void From(ActivityStatus.Context context, PushMessagePart push, params object?[] sources)
+    public static void From(IReadOnlyDictionary<string, object?> properties, PushMessagePart push, params object?[] sources)
     {
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(context, source, push);
+                ByInterface(properties, source, push);
                 ByAttribute(source, push);
             }
         }
     }
 
-    private static void ByInterface(ActivityStatus.Context context, object source, PushMessagePart push)
+    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, PushMessagePart push)
     {
         if (source is IMessagePartFeed messagePartFeed)
         {
-            messagePartFeed.MessageParts(context, push);
+            messagePartFeed.MessageParts(properties, push);
         }
     }
 
@@ -36,7 +37,7 @@ public static class GetMessageParts
         {
             if (getter.GetValue(source) is { } value)
             {
-                push(getter.Template, value);
+                push(getter.Template(StatePrefix), value);
             }
         }
     }
@@ -49,24 +50,31 @@ public static class GetMessageParts
             from property in type.GetProperties(flags)
             let attr = property.GetCustomAttribute<FeedToMessagePart>()
             where attr is not null
-            select new Getter(TemplateFor(property, attr), Getter.Compile(type, property));
+            select new Getter(property.Name, attr, Getter.Compile(type, property));
 
         return [..messagePartGetters];
     }
 
-    private static string TemplateFor(PropertyInfo property, FeedToMessagePart attr)
+    private static string TemplateFor(string prefix, string propertyName, FeedToMessagePart attr)
     {
+        var key = $"{prefix}.{propertyName}";
+
         if (!attr.IncludeLabel)
         {
-            return $"{{{property.Name}}}";
+            return $"{{{key}}}";
         }
 
-        var label = attr.Label ?? property.Name;
-        return $"{label}{attr.Separator}{{{property.Name}}}";
+        var label = attr.Label ?? propertyName;
+        return $"{label}{attr.Separator}{{{key}}}";
     }
 
-    private sealed record Getter(string Template, Func<object, object?> GetValue)
+    private sealed record Getter(string PropertyName, FeedToMessagePart Attribute, Func<object, object?> GetValue)
     {
+        public string Template(string prefix)
+        {
+            return TemplateFor(prefix, PropertyName, Attribute);
+        }
+
         public static Func<object, object?> Compile(Type type, PropertyInfo property)
         {
             if (!property.CanRead)

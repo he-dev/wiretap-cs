@@ -4,46 +4,39 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;
 
-public class SnapScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope where TActivity : Activity.Snap
+public class SnapScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope<TActivity>(activity) where TActivity : Activity.Snap
 {
-    public override string ActivityName => activity.Name;
-
     internal static void Log(ILogger logger, TActivity activity, ActivityStatus<TActivity> status)
     {
         using var scope = new SnapScope<TActivity>(logger, activity).Also(x => x.Push());
         scope.Log(status);
     }
 
-    public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
-        base.MessageParts(context, push);
-        push("Elapsed: N/A");
+        base.MessageParts(properties, push);
+        push("Duration: N/A");
     }
 
-    private ActivityStatus.Context CreateContext(ActivityStatus<TActivity> status)
+    public override void StateItems(PushStateItem push)
     {
-        return new()
-        {
-            Activity = activity.Name,
-            ActivityStatus = status.Code,
-            ActivityDepth = Depth,
-            ActivityPath = Path,
-            ParentActivity = Parent?.ActivityName,
-            MessageRole = nameof(MessageRole.Data),
-            Duration = TimeSpan.Zero
-        };
+        base.StateItems(push);
+
+        push("wiretap.activity.role", "snap");
     }
 
     private void Log(ActivityStatus<TActivity> status)
     {
-        var context = CreateContext(status);
-        var stateItems = GetStateItems.From(this, context, activity, status);
+        var properties = GetStateItems.From(
+            this,
+            new ActivityDurationFeed.Zero(),
+            activity,
+            status
+        );
 
-        using (logger.BeginScope(stateItems))
+        using (logger.BeginScope(properties))
         {
-            var template = GetComposeMessage
-                .FromAttributeOrDefault(activity.GetType())
-                .From(context, this, activity as IMessagePartFeed, status as IMessagePartFeed);
+            var template = ComposeMessage.From(properties, this, activity, status);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }

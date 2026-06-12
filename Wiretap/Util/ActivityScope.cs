@@ -5,15 +5,7 @@ namespace Wiretap.Util;
 
 public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposable
 {
-    public static ActivityScope? Current => ActivityScopeStack<ActivityScope>.Current;
-
-    protected System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
-
-    protected TimeSpan Elapsed => Stopwatch.Elapsed;
-
     private ActivityScopeStack<ActivityScope>? AmbientScope { get; set; }
-
-    public ActivityScope? Parent => AmbientScope?.Parent?.Value;
 
     public int Depth => AmbientScope.Depth;
 
@@ -21,13 +13,20 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
 
     public abstract string ActivityName { get; }
 
-    public virtual void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
-        push("{Activity}[{ActivityStatus}]", context.Activity, context.ActivityStatus);
+        push(
+            "{wiretap.activity.name}[{wiretap.activity.status.code}]",
+            properties["wiretap.activity.name"],
+            properties["wiretap.activity.status.code"]
+        );
     }
 
     public virtual void StateItems(PushStateItem push)
     {
+        push("wiretap.activity.name", ActivityName);
+        push("wiretap.activity.depth", Depth);
+        push("wiretap.activity.path", Path);
     }
 
     internal virtual void Push()
@@ -40,21 +39,26 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
     }
+}
 
-    public static KeyValuePair<string, object?>[] CurrentItemTags()
+public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope where TActivity : Activity
+{
+    protected TActivity Activity => activity;
+
+    public override string ActivityName => activity.Name;
+
+    protected ComposeMessage ComposeMessage => GetComposeMessage.FromAttributeOrDefault(activity.GetType());
+}
+
+internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed
+{
+    public sealed record Zero() : ActivityDurationFeed(TimeSpan.Zero);
+
+    // core: Freezes the duration because the last activity may be logged later than set.
+    public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
+
+    public void StateItems(PushStateItem push)
     {
-        if (Current is { } current)
-        {
-            return
-            [
-                new(nameof(ActivityStatus.Context.Activity), current.ActivityName),
-                new(nameof(ActivityStatus.Context.ActivityDepth), current.Depth),
-                new(nameof(ActivityStatus.Context.ActivityPath), current.Path),
-                new(nameof(ActivityStatus.Context.ParentActivity), current.Parent?.ActivityName),
-                new(nameof(ActivityStatus.Context.Duration), (long)current.Elapsed.TotalMilliseconds),
-            ];
-        }
-
-        return [];
+        push("wiretap.activity.duration_ms", (long)Duration.TotalMilliseconds);
     }
 }

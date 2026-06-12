@@ -6,7 +6,7 @@ internal sealed class ActivityWrapper(string name) : IDisposable
 {
     private static readonly ActivitySource Source = new(nameof(Wiretap));
 
-    private System.Diagnostics.Activity? Inner { get; } = Source.StartActivity(name);
+    private Activity? Inner { get; } = Source.StartActivity(name);
 
     public ActivityWrapper AddTag(string name, object value)
     {
@@ -20,9 +20,9 @@ internal sealed class ActivityWrapper(string name) : IDisposable
         {
             var statusCode = isOk switch
             {
-                true => System.Diagnostics.ActivityStatusCode.Ok,
-                false => System.Diagnostics.ActivityStatusCode.Error,
-                _ => System.Diagnostics.ActivityStatusCode.Unset
+                true => ActivityStatusCode.Ok,
+                false => ActivityStatusCode.Error,
+                _ => ActivityStatusCode.Unset
             };
 
             Inner

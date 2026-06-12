@@ -4,22 +4,28 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;
 
-public sealed class BulkScope<TActivity, TItem>(ILogger logger, TActivity activity) : BuzzScope<TActivity>(logger, activity)
-    where TActivity : Activity.Bulk<TActivity, TItem>
+public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : BuzzScope<TBulk>(logger, activity)
+    where TBulk : Activity.Bulk<TBulk, TItem>
     where TItem : Activity.Buzz
 {
     private BulkMath Math { get; } = new();
 
+    protected override string Role => "bulk";
+
     public override void StateItems(PushStateItem push)
     {
         base.StateItems(push);
-        Math.StateItems(push);
+
+        foreach (var (key, value) in GetStateItems.From(Math))
+        {
+            push($"wiretap.activity.state.{key}", value);
+        }
     }
 
-    public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
-        base.MessageParts(context, push);
-        Math.MessageParts(context, push);
+        base.MessageParts(properties, push);
+        Math.MessageParts(properties, push);
     }
 
     public ItemScope<TItem> BeginItem(TItem item)
@@ -28,5 +34,14 @@ public sealed class BulkScope<TActivity, TItem>(ILogger logger, TActivity activi
     }
 }
 
-public sealed class ItemScope<TActivity>(ILogger logger, TActivity activity, Action<ActivityStatus<TActivity>, TimeSpan> count, StatusLogPolicy statusLogPolicy)
-    : BuzzScope<TActivity>(logger, activity, statusLogPolicy, count) where TActivity : Activity.Buzz;
+public sealed class ItemScope<TActivity>
+(
+    ILogger logger,
+    TActivity activity,
+    CountStatus<TActivity> count,
+    StatusLogPolicy statusLogPolicy
+) : BuzzScope<TActivity>(logger, activity, statusLogPolicy, count) where TActivity : Activity.Buzz
+{
+    protected override string Role => "item";
+}
+

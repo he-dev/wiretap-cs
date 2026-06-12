@@ -14,11 +14,11 @@ public static class LoggerExtensions
             return new BuzzScope<TActivity>(logger, activity).Also(x => x.Push());
         }
 
-        public BulkScope<TActivity, TItem> BeginBulk<TActivity, TItem>(Activity.Bulk<TActivity, TItem> activity)
-            where TActivity : Activity.Bulk<TActivity, TItem>
+        public BulkScope<TBulk, TItem> BeginBulk<TBulk, TItem>(Activity.Bulk<TBulk, TItem> activity)
+            where TBulk : Activity.Bulk<TBulk, TItem>
             where TItem : Activity.Buzz
         {
-            return new BulkScope<TActivity, TItem>(logger, (TActivity)activity).Also(x => x.Push());
+            return new BulkScope<TBulk, TItem>(logger, (TBulk)activity).Also(x => x.Push());
         }
 
         public void LogSnap<TActivity>(TActivity activity, ActivityStatus<TActivity> status) where TActivity : Activity.Snap

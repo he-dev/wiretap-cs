@@ -10,7 +10,7 @@ namespace Wiretap.Util;
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Assembly)]
 public abstract class ComposeMessage : Attribute
 {
-    public abstract MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds);
+    public abstract MessageTemplate From(IReadOnlyDictionary<string, object?> properties, params object?[] messagePartFeeds);
 }
 
 public static class GetComposeMessage
@@ -19,11 +19,27 @@ public static class GetComposeMessage
 
     public static ComposeMessage FromAttributeOrDefault(Type activityType)
     {
-        return Cache.GetOrAdd(activityType, type =>
-            type.GetCustomAttribute<ComposeMessage>(inherit: true)
-            ?? type.Assembly.GetCustomAttribute<ComposeMessage>()
-            ?? Assembly.GetEntryAssembly()?.GetCustomAttribute<ComposeMessage>()
-            ?? Default);
+        return Cache.GetOrAdd(activityType, ResolveOrDefault);
+    }
+
+    private static ComposeMessage ResolveOrDefault(Type type)
+    {
+        if (type.GetCustomAttribute<ComposeMessage>(inherit: true) is { } byTypeAttribute)
+        {
+            return byTypeAttribute;
+        }
+
+        if (type.Assembly.GetCustomAttribute<ComposeMessage>() is { } byAssemblyAttribute)
+        {
+            return byAssemblyAttribute;
+        }
+
+        if (Assembly.GetEntryAssembly()?.GetCustomAttribute<ComposeMessage>() is { } byEntryAssemblyAttribute)
+        {
+            return byEntryAssemblyAttribute;
+        }
+
+        return Default;
     }
 
     private static readonly ComposeMessage Default = new ComposeMessageByAppending();
@@ -32,7 +48,7 @@ public static class GetComposeMessage
 // core: Implements a message schema where parts are appended in feed order and joined by a separator.
 public class ComposeMessageByAppending(string separator = "; ") : ComposeMessage
 {
-    public override MessageTemplate From(ActivityStatus.Context context, params object?[] messagePartFeeds)
+    public override MessageTemplate From(IReadOnlyDictionary<string, object?> properties, params object?[] messagePartFeeds)
     {
         // note: Does not use LINQ for better performance.
 
@@ -49,7 +65,7 @@ public class ComposeMessageByAppending(string separator = "; ") : ComposeMessage
             }
         });
 
-        GetMessageParts.From(context, push, messagePartFeeds);
+        GetMessageParts.From(properties, push, messagePartFeeds);
 
         return new(temp.ToString(), args.ToArray());
     }
@@ -59,13 +75,10 @@ public delegate void PushMessagePart([StructuredMessageTemplate] string? message
 
 public interface IMessagePartFeed
 {
-    void MessageParts(ActivityStatus.Context context, PushMessagePart push);
+    void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push);
 }
 
 public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
 {
-    public void MessageParts(ActivityStatus.Context context, PushMessagePart push)
-    {
-        push(message, args);
-    }
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push) => push(message, args);
 }

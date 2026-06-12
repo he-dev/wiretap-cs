@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using Wiretap.Core;
 
 namespace Wiretap.Util;
 
@@ -13,7 +12,7 @@ public sealed class LoggerProxy<T>(ILogger inner, params KeyValuePair<string, ob
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        using (inner.BeginScope(ActivityScope.CurrentItemTags()))
+        //using (inner.BeginScope(ActivityScope.CurrentItemTags()))
         using (Items.Count == 0 ? null : inner.BeginScope(Items))
         {
             inner.Log(logLevel, eventId, state, exception, formatter);

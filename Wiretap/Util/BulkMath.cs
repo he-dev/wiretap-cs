@@ -65,7 +65,7 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         push("throughput_s", ThroughputS);
     }
 
-    public void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
         if (ItemCount == 0)
         {
@@ -75,10 +75,15 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         foreach (var code in _statusCounts.Keys)
         {
             var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
-            push($"{label}: {{{code}_rate:P1}} ({{{code}_count}} of {{item_count}})", RateOf(code), _statusCounts[code], ItemCount);
+            push(
+                $"{label}: {{wiretap.activity.state.{code}_rate:P1}} ({{wiretap.activity.state.{code}_count}} of {{wiretap.activity.state.item_count}})",
+                RateOf(code),
+                _statusCounts[code],
+                ItemCount
+            );
         }
 
-        push("Throughput: {throughput_s:N1}/s", ThroughputS);
+        push("Throughput: {wiretap.activity.state.throughput_s:N1}/s", ThroughputS);
     }
 
     private double RateOf(string code)

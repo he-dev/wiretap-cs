@@ -18,20 +18,20 @@ public abstract class Activity
         Name = GetActivityName.For(GetType());
     }
 
-    public string Name { get; }
+    public virtual string Name { get; }
 
     public abstract class Buzz : Activity;
 
     public abstract class Bulk : Buzz
     {
-        public abstract StatusLogPolicy StatusLogPolicy { get; }
+        public abstract StatusLogPolicy StatusLogPolicy { get; init; }
     }
 
-    public abstract class Bulk<TActivity, TItem>(StatusLogPolicy statusLogPolicy) : Bulk
-        where TActivity : Bulk<TActivity, TItem>
+    public abstract class Bulk<TBulk, TItem>(StatusLogPolicy statusLogPolicy) : Bulk
+        where TBulk : Bulk<TBulk, TItem>
         where TItem : Buzz
     {
-        public override StatusLogPolicy StatusLogPolicy => statusLogPolicy;
+        public override StatusLogPolicy StatusLogPolicy { get; init; } = statusLogPolicy;
     }
 
     public abstract class Snap : Activity;

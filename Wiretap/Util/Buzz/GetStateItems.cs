@@ -13,14 +13,15 @@ public interface IStateItemFeed
 
 public static class GetStateItems
 {
+    private const string StatePrefix = "wiretap.activity.state";
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
-    public static IEnumerable<KeyValuePair<string, object?>> From(params object?[] sources)
+    public static Dictionary<string, object?> From(params object?[] sources)
     {
         // note: Using a list rather than Enumerable.Concat for performance reasons.
 
-        var stateItems = new List<KeyValuePair<string, object?>>(32);
-        var pushStateItem = new PushStateItem((key, value) => stateItems.Add(new(key, value)));
+        var stateItems = new Dictionary<string, object?>();
+        var pushStateItem = new PushStateItem((key, value) => stateItems[key] = value);
 
         foreach (var source in sources)
         {
@@ -50,7 +51,7 @@ public static class GetStateItems
         {
             if (getter.GetValue(source) is { } value)
             {
-                push(getter.Key, value);
+                push($"{StatePrefix}.{getter.Key}", value);
             }
         }
     }

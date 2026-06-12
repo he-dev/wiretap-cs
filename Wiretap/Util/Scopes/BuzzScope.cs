@@ -1,38 +1,42 @@
-﻿using JetBrains.Annotations;
+using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;
 
-public class BuzzScope<TActivity>(
+public delegate void CountStatus<TActivity>(ActivityStatus<TActivity> status, TimeSpan duration) where TActivity : Activity.Buzz;
+
+public class BuzzScope<TActivity>
+(
     ILogger logger,
     TActivity activity,
     StatusLogPolicy statusLogPolicy = StatusLogPolicy.Both,
-    Action<ActivityStatus<TActivity>, TimeSpan>? onLastStatus = null
-) : ActivityScope where TActivity : Activity.Buzz
+    CountStatus<TActivity>? onLastStatus = null
+) : ActivityScope<TActivity>(activity) where TActivity : Activity.Buzz
 {
+    private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
     private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
-    private (ActivityStatus<TActivity> Status, IMessagePartFeed? Suffix, TimeSpan Duration)? _lastStatus;
+    private Snapshot? _lastStatus;
     private bool _disposed;
-    protected TActivity Activity => activity;
+
     protected ILogger Logger => logger;
-    public override string ActivityName => activity.Name;
+
+    protected virtual string Role => "buzz";
 
     public void SetStatus(ActivityStatus<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
     {
-        var suffix = new LastStatusMessageFeed(message, args);
+        // note: Makes sure everyone uses the same value.
         var duration = Stopwatch.Elapsed;
 
         if (_lastStatus is { } lastStatus)
         {
-            var context = CreateContext(status, duration);
-            var stateItems = GetStateItems.From(this, context, activity, status);
+            var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration), activity, status);
 
-            using (logger.BeginScope(stateItems))
+            using (logger.BeginScope(state))
             {
                 logger.LogWarning(
-                    "{Activity} status changed from [{PreviousStatus}] to [{CurrentStatus}] before scope exit.",
+                    "{wiretap.activity.name} status changed from [{wiretap.activity.state.status.code.old}] to [{wiretap.activity.state.status.code.new}] before scope exit.",
                     activity.Name,
                     lastStatus.Status.Code,
                     status.Code
@@ -40,54 +44,33 @@ public class BuzzScope<TActivity>(
             }
         }
 
-        _lastStatus = (status, suffix, duration);
+        _lastStatus = new(status, new LastStatusMessageFeed(message, args), duration);
     }
 
-    public override void MessageParts(ActivityStatus.Context context, PushMessagePart push)
+    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
-        base.MessageParts(context, push);
-        push("Elapsed: {ElapsedMs:N0} ms", context.Duration.TotalMilliseconds);
+        base.MessageParts(properties, push);
+        push("Duration: {wiretap.activity.duration_ms:N0} ms", properties["wiretap.activity.duration_ms"]);
     }
 
-    private ActivityStatus.Context CreateContext(ActivityStatus<TActivity> status, TimeSpan duration)
+    public override void StateItems(PushStateItem push)
     {
-        return new()
-        {
-            Activity = activity.Name,
-            ActivityStatus = status.Code,
-            ActivityDepth = Depth,
-            ActivityPath = Path,
-            ParentActivity = Parent?.ActivityName,
-            MessageRole = nameof(MessageRole.Data),
-            Duration = duration
-        };
+        base.StateItems(push);
+
+        push("wiretap.activity.role", Role);
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
     {
-        if (status is ActivityStatusRole.ILast)
+        duration ??= Stopwatch.Elapsed;
+        var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration.Value), activity, status);
+
+        using (logger.BeginScope(state))
         {
-            ActivityWrapper.Stop(isOk: status switch
-            {
-                ActivityStatus<TActivity>.Okay => true,
-                ActivityStatus<TActivity>.Fail => false,
-                _ => null
-            });
-        }
-
-        var context = CreateContext(status, duration ?? Stopwatch.Elapsed);
-
-        var stateItems = GetStateItems.From(this, context, activity, status);
-
-        using (logger.BeginScope(stateItems))
-        {
-            var template = GetComposeMessage
-                .FromAttributeOrDefault(activity.GetType())
-                .From(context, this, activity as IMessagePartFeed, status as IMessagePartFeed, suffix);
+            var template = ComposeMessage.From(state, this, activity, status, suffix);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }
-
 
     internal override void Push()
     {
@@ -108,14 +91,20 @@ public class BuzzScope<TActivity>(
 
         try
         {
-            _lastStatus ??= (new ActivityStatus<TActivity>.Void(), null, Stopwatch.Elapsed);
-            var lastStatus = _lastStatus!.Value;
+            _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), null, Stopwatch.Elapsed);
+            ActivityWrapper.Stop(isOk: _lastStatus.Status switch
+            {
+                ActivityStatus<TActivity>.Okay => true,
+                ActivityStatus<TActivity>.Fail => false,
+                _ => null
+            });
+
             if (statusLogPolicy.HasFlag(StatusLogPolicy.Last))
             {
-                LogStatus(lastStatus.Status, lastStatus.Suffix, lastStatus.Duration);
+                LogStatus(_lastStatus.Status, _lastStatus.Message, _lastStatus.Duration);
             }
 
-            onLastStatus?.Invoke(lastStatus.Status, lastStatus.Duration);
+            onLastStatus?.Invoke(_lastStatus.Status, _lastStatus.Duration);
         }
         finally
         {
@@ -124,4 +113,6 @@ public class BuzzScope<TActivity>(
             _disposed = true;
         }
     }
+
+    private record Snapshot(ActivityStatus<TActivity> Status, IMessagePartFeed? Message, TimeSpan Duration);
 }
