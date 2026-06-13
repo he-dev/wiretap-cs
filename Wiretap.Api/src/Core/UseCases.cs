@@ -34,9 +34,9 @@ public class DeleteFile : Activity.Buzz
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
-        public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+        public void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
         {
-            push((name, next) => next($"Reason: {name.Activity.State.Append("Reason"):_}", Reason));
+            feed((name, next) => next($"Reason: {name.Activity.State.Append("Reason"):_}", Reason));
         }
 
         public sealed class NotFound : DeleteFile.Noop
@@ -77,8 +77,8 @@ public class CopyFile : Activity.Buzz, IStateItemFeed
     [ScopeStateItem]
     public required string Path { get; init; }
 
-    public void StateItems(SchemaFeed<PushStateItem> push)
+    public void StateItems(ItemFeed<PushStateItem> feed)
     {
-        push((name, next) => next(name.Activity.State.Append("CustomItem"), "CustomValue"));
+        feed((name, next) => next(name.Activity.State.Append("CustomItem"), "CustomValue"));
     }
 }

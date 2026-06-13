@@ -37,9 +37,9 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Error;
 
-        public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+        public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
         {
-            push((name, next) =>
+            feed((name, next) =>
             {
                 if (Exception is not null)
                 {
@@ -56,9 +56,9 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Warning;
 
-        public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+        public void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
         {
-            push((name, next) => next("The activity scope exited without an explicit last status."));
+            feed((name, next) => next("The activity scope exited without an explicit last status."));
         }
     }
 }
@@ -71,9 +71,9 @@ public abstract class ActivityStatus : IStateItemFeed
 
     public Exception? Exception { get; init; }
 
-    public virtual void StateItems(SchemaFeed<PushStateItem> push)
+    public virtual void StateItems(ItemFeed<PushStateItem> feed)
     {
-        push((name, next) =>
+        feed((name, next) =>
         {
             next(name.Activity.Status.Code, Code);
             next(name.Activity.Status.Role, this switch

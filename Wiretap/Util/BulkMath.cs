@@ -42,14 +42,14 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         _durationM2 += delta * delta2;
     }
 
-    public void StateItems(SchemaFeed<PushStateItem> push)
+    public void StateItems(ItemFeed<PushStateItem> feed)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        push((name, next) =>
+        feed((name, next) =>
         {
             next(name.Activity.State.Append("item_count"), ItemCount);
 
@@ -68,14 +68,14 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         });
     }
 
-    public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        push((name, next) =>
+        feed((name, next) =>
         {
             foreach (var code in _statusCounts.Keys)
             {

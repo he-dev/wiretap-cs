@@ -15,23 +15,23 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
 
     protected abstract string Role { get; }
 
-    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
     {
-        push((name, next) => next(
+        feed((name, push) => push(
             $"{name.Activity.Name:_}[{name.Activity.Status.Code:_}]",
             properties[name.Activity.Name],
             properties[name.Activity.Status.Code]
         ));
     }
 
-    public virtual void StateItems(SchemaFeed<PushStateItem> push)
+    public virtual void StateItems(ItemFeed<PushStateItem> feed)
     {
-        push((name, next) =>
+        feed((name, push) =>
         {
-            next(name.Activity.Name, ActivityName);
-            next(name.Activity.Role, Role);
-            next(name.Activity.Depth, Depth);
-            next(name.Activity.Path, Path);
+            push(name.Activity.Name, ActivityName);
+            push(name.Activity.Role, Role);
+            push(name.Activity.Depth, Depth);
+            push(name.Activity.Path, Path);
         });
     }
 
@@ -63,8 +63,8 @@ internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed
     // core: Freezes the duration because the last activity may be logged later than set.
     public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
 
-    public void StateItems(SchemaFeed<PushStateItem> push)
+    public void StateItems(ItemFeed<PushStateItem> feed)
     {
-        push((name, next) => next(name.Activity.DurationMs, (long)Duration.TotalMilliseconds));
+        feed((name, next) => next(name.Activity.DurationMs, (long)Duration.TotalMilliseconds));
     }
 }

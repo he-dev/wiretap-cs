@@ -11,7 +11,7 @@ public static class GetMessageParts
     public static void From(IReadOnlyDictionary<string, object?> properties, PushMessagePart push, params object?[] sources)
     {
         var root = Configuration.Current.PropertyName;
-        var pushSchemaFeed = new SchemaFeed<PushMessagePart>(feed => feed(root, push));
+        var pushSchemaFeed = new ItemFeed<PushMessagePart>(feed => feed(root, push));
 
         foreach (var source in sources)
         {
@@ -23,7 +23,7 @@ public static class GetMessageParts
         }
     }
 
-    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, SchemaFeed<PushMessagePart> push)
+    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, ItemFeed<PushMessagePart> push)
     {
         if (source is IMessagePartFeed messagePartFeed)
         {
