@@ -1,64 +1,55 @@
 namespace Wiretap.Util;
 
-public interface IPropertyNameSchema
+public readonly record struct PropertyName(string Separator = ".", params string[] Parts) : IFormattable
 {
-    string Render(params string[] parts);
-}
-
-public record PropertyNameSchema : IPropertyNameSchema
-{
-    public string[] Prefix { get; init; } = ["wiretap"];
-
-    public string Separator { get; init; } = ".";
-
-    public PropertyNameBuilder Root => new(this, []);
-
-    public string Render(params string[] parts) => string.Join(Separator, [..Prefix, ..parts]);
-}
-
-public readonly record struct PropertyNameBuilder(IPropertyNameSchema Schema, string[] Parts)
-{
-    public PropertyNameBuilder Append(params string[] parts)
+    public PropertyName Append(params string[] parts)
     {
         return this with { Parts = [..Parts, ..parts] };
     }
 
-    public PropertyNamePlaceholder ToTemplate() => new(this);
-
-    public static implicit operator string(PropertyNameBuilder value)
+    public override string ToString()
     {
-        return value.Schema.Render(value.Parts);
+        return string.Join(Separator, Parts);
+    }
+
+    public string ToString(string? format, IFormatProvider? formatProvider)
+    {
+        var name = ToString();
+
+        return format switch
+        {
+            null or "" => name,
+            "_" => $"{{{name}}}",
+            _ => $"{{{name}:{format}}}"
+        };
+    }
+
+    public static implicit operator string(PropertyName value)
+    {
+        return value.ToString();
     }
 }
 
-public readonly record struct PropertyNamePlaceholder(PropertyNameBuilder Name)
+public static class PropertyNameExtensions
 {
-    public static implicit operator string(PropertyNamePlaceholder value)
+    extension(PropertyName name)
     {
-        return $"{{{value.Name}}}";
-    }
-}
+        public PropertyName Activity => name.Append("activity");
 
-public static class PropertyNameBuilderExtensions
-{
-    extension(PropertyNameBuilder name)
-    {
-        public PropertyNameBuilder Activity => name.Append("activity");
+        public PropertyName State => name.Append("state");
 
-        public PropertyNameBuilder State => name.Append("state");
+        public PropertyName Status => name.Append("status");
 
-        public PropertyNameBuilder Status => name.Append("status");
+        public PropertyName Name => name.Append("name");
 
-        public PropertyNameBuilder Name => name.Append("name");
+        public PropertyName Role => name.Append("role");
 
-        public PropertyNameBuilder Role => name.Append("role");
+        public PropertyName Code => name.Append("code");
 
-        public PropertyNameBuilder Code => name.Append("code");
+        public PropertyName Depth => name.Append("depth");
 
-        public PropertyNameBuilder Depth => name.Append("depth");
+        public PropertyName Path => name.Append("path");
 
-        public PropertyNameBuilder Path => name.Append("path");
-
-        public PropertyNameBuilder DurationMs => name.Append("duration_ms");
+        public PropertyName DurationMs => name.Append("duration_ms");
     }
 }
