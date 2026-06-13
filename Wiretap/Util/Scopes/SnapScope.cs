@@ -34,5 +34,12 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
             var template = ComposeMessage.From(properties, this, activity, status);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
+
+        ActivityWrapper.Stop(isOk: status switch
+        {
+            ActivityStatus<TActivity>.Okay => true,
+            ActivityStatus<TActivity>.Fail => false,
+            _ => null
+        });
     }
 }

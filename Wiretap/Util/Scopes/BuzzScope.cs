@@ -16,7 +16,6 @@ public class BuzzScope<TActivity>
 ) : ActivityScope<TActivity>(activity) where TActivity : Activity.Buzz
 {
     private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
-    private ActivityWrapper ActivityWrapper { get; } = new(activity.Name);
     private Snapshot? _lastStatus;
     private bool _disposed;
 
@@ -102,7 +101,6 @@ public class BuzzScope<TActivity>
         }
         finally
         {
-            ActivityWrapper.Dispose();
             base.Dispose();
             _disposed = true;
         }

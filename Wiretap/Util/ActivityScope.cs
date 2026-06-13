@@ -3,15 +3,16 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposable
+public abstract class ActivityScope(string activityName) : IStateItemFeed, IMessagePartFeed, IDisposable
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
+    protected ActivityWrapper ActivityWrapper { get; } = new(activityName);
 
     public int Depth => AmbientScope.Depth;
 
     public string Path => AmbientScope.PathOf(x => x.ActivityName);
 
-    public abstract string ActivityName { get; }
+    public string ActivityName { get; } = activityName;
 
     protected abstract string Role { get; }
 
@@ -26,6 +27,8 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
 
     public virtual void StateItems(ItemFeed<PushStateItem> feed)
     {
+        ActivityWrapper.StateItems(feed);
+
         feed((name, push) =>
         {
             push(name.Activity.Name, ActivityName);
@@ -42,16 +45,15 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
 
     public virtual void Dispose()
     {
+        ActivityWrapper.Dispose();
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
     }
 }
 
-public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope where TActivity : Activity
+public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity.Name) where TActivity : Activity
 {
     protected TActivity Activity => activity;
-
-    public override string ActivityName => activity.Name;
 
     protected IComposeMessage ComposeMessage => Configuration.Current.ComposeMessage;
 }

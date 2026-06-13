@@ -45,7 +45,7 @@ using (var scope = app.Services.CreateScope())
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var loopCount = args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase) ? 10_000 : 1;
 
-    using (var _ = Wiretap.Util.Configuration.Push(new() { AttachTraceContext = true, ComposeMessage = new ComposeMessageByAppending() }))
+    using var _ = Wiretap.Util.Configuration.Push(new() { AttachTraceContext = true, ComposeMessage = new ComposeMessageByAppending() });
     using (var bulk = logger.BeginBulk(new Wires.DeleteFolder { Path = "batch" }))
     {
         for (var i = 0; i < loopCount; i++)
