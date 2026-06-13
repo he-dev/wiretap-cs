@@ -2,8 +2,6 @@ using System.Collections.Generic;
 using Wiretap.Util;
 using Wiretap.Util.Buzz;
 
-[assembly: ComposeMessageByAppending]
-
 // ReSharper disable once CheckNamespace
 namespace Wires;
 

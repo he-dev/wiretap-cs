@@ -22,7 +22,7 @@ public class BuzzScope<TActivity>
 
     protected ILogger Logger => logger;
 
-    protected virtual string Role => "buzz";
+    protected override string Role => "buzz";
 
     public void SetStatus(ActivityStatus<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
     {
@@ -51,13 +51,6 @@ public class BuzzScope<TActivity>
     {
         base.MessageParts(properties, push);
         push("Duration: {wiretap.activity.duration_ms:N0} ms", properties["wiretap.activity.duration_ms"]);
-    }
-
-    public override void StateItems(PushStateItem push)
-    {
-        base.StateItems(push);
-
-        push("wiretap.activity.role", Role);
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
@@ -115,4 +108,9 @@ public class BuzzScope<TActivity>
     }
 
     private record Snapshot(ActivityStatus<TActivity> Status, IMessagePartFeed? Message, TimeSpan Duration);
+}
+
+public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
+{
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push) => push(message, args);
 }

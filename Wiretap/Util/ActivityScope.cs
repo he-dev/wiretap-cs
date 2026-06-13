@@ -5,13 +5,15 @@ namespace Wiretap.Util;
 
 public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposable
 {
-    private ActivityScopeStack<ActivityScope>? AmbientScope { get; set; }
+    private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
     public int Depth => AmbientScope.Depth;
 
     public string Path => AmbientScope.PathOf(x => x.ActivityName);
 
     public abstract string ActivityName { get; }
+
+    protected abstract string Role { get; }
 
     public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
     {
@@ -25,13 +27,14 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
     public virtual void StateItems(PushStateItem push)
     {
         push("wiretap.activity.name", ActivityName);
+        push("wiretap.activity.role", Role);
         push("wiretap.activity.depth", Depth);
         push("wiretap.activity.path", Path);
     }
 
     internal virtual void Push()
     {
-        AmbientScope = ActivityScopeStack<ActivityScope>.Push(this);
+        AmbientScope = AmbientContext<ActivityScope>.Push(this);
     }
 
     public virtual void Dispose()
@@ -47,7 +50,7 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
 
     public override string ActivityName => activity.Name;
 
-    protected ComposeMessage ComposeMessage => GetComposeMessage.FromAttributeOrDefault(activity.GetType());
+    protected IComposeMessage ComposeMessage => Configuration.Current.ComposeMessage;
 }
 
 internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed

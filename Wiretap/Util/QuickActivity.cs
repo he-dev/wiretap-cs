@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
