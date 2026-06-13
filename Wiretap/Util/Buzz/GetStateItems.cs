@@ -8,12 +8,11 @@ public delegate void PushStateItem(string key, object? value);
 
 public interface IStateItemFeed
 {
-    void StateItems(PushStateItem push);
+    void StateItems(SchemaFeed<PushStateItem> push);
 }
 
 public static class GetStateItems
 {
-    private const string StatePrefix = "wiretap.activity.state";
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
     public static Dictionary<string, object?> From(params object?[] sources)
@@ -21,21 +20,23 @@ public static class GetStateItems
         // note: Using a list rather than Enumerable.Concat for performance reasons.
 
         var stateItems = new Dictionary<string, object?>();
+        var root = Configuration.Current.PropertyName;
         var pushStateItem = new PushStateItem((key, value) => stateItems[key] = value);
+        var pushSchemaFeed = new SchemaFeed<PushStateItem>(feed => feed(root, pushStateItem));
 
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(source, pushStateItem);
-                ByAttribute(source, pushStateItem);
+                ByInterface(source, pushSchemaFeed);
+                ByAttribute(root, source, pushStateItem);
             }
         }
 
         return stateItems;
     }
 
-    private static void ByInterface(object source, PushStateItem push)
+    private static void ByInterface(object source, SchemaFeed<PushStateItem> push)
     {
         if (source is IStateItemFeed stateItemFeed)
         {
@@ -43,7 +44,7 @@ public static class GetStateItems
         }
     }
 
-    private static void ByAttribute<T>(T source, PushStateItem push) where T : notnull
+    private static void ByAttribute<T>(PropertyName root, T source, PushStateItem push) where T : notnull
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
 
@@ -51,7 +52,7 @@ public static class GetStateItems
         {
             if (getter.GetValue(source) is { } value)
             {
-                push($"{StatePrefix}.{getter.Key}", value);
+                push(root.Activity.State.Append(getter.Key), value);
             }
         }
     }

@@ -15,21 +15,24 @@ public abstract class ActivityScope : IStateItemFeed, IMessagePartFeed, IDisposa
 
     protected abstract string Role { get; }
 
-    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
     {
-        push(
-            "{wiretap.activity.name}[{wiretap.activity.status.code}]",
-            properties["wiretap.activity.name"],
-            properties["wiretap.activity.status.code"]
-        );
+        push((name, next) => next(
+            $"{name.Activity.Name:_}[{name.Activity.Status.Code:_}]",
+            properties[name.Activity.Name],
+            properties[name.Activity.Status.Code]
+        ));
     }
 
-    public virtual void StateItems(PushStateItem push)
+    public virtual void StateItems(SchemaFeed<PushStateItem> push)
     {
-        push("wiretap.activity.name", ActivityName);
-        push("wiretap.activity.role", Role);
-        push("wiretap.activity.depth", Depth);
-        push("wiretap.activity.path", Path);
+        push((name, next) =>
+        {
+            next(name.Activity.Name, ActivityName);
+            next(name.Activity.Role, Role);
+            next(name.Activity.Depth, Depth);
+            next(name.Activity.Path, Path);
+        });
     }
 
     internal virtual void Push()
@@ -60,8 +63,8 @@ internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed
     // core: Freezes the duration because the last activity may be logged later than set.
     public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
 
-    public void StateItems(PushStateItem push)
+    public void StateItems(SchemaFeed<PushStateItem> push)
     {
-        push("wiretap.activity.duration_ms", (long)Duration.TotalMilliseconds);
+        push((name, next) => next(name.Activity.DurationMs, (long)Duration.TotalMilliseconds));
     }
 }

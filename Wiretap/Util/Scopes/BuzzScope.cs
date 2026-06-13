@@ -32,11 +32,12 @@ public class BuzzScope<TActivity>
         if (_lastStatus is { } lastStatus)
         {
             var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration), activity, status);
+            var name = Configuration.Current.PropertyName;
 
             using (logger.BeginScope(state))
             {
                 logger.LogWarning(
-                    "{wiretap.activity.name} status changed from [{wiretap.activity.state.status.code.old}] to [{wiretap.activity.state.status.code.new}] before scope exit.",
+                    $"{name.Activity.Name:_} status changed from [{name.Activity.State.Append("status", "code", "old"):_}] to [{name.Activity.State.Append("status", "code", "new"):_}] before scope exit.",
                     activity.Name,
                     lastStatus.Status.Code,
                     status.Code
@@ -47,10 +48,10 @@ public class BuzzScope<TActivity>
         _lastStatus = new(status, new LastStatusMessageFeed(message, args), duration);
     }
 
-    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
     {
         base.MessageParts(properties, push);
-        push("Duration: {wiretap.activity.duration_ms:N0} ms", properties["wiretap.activity.duration_ms"]);
+        push((name, next) => next($"Duration: {name.Activity.DurationMs:N0} ms", properties[name.Activity.DurationMs]));
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
@@ -112,5 +113,8 @@ public class BuzzScope<TActivity>
 
 public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
 {
-    public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push) => push(message, args);
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
+    {
+        push((name, next) => next(message, args));
+    }
 }

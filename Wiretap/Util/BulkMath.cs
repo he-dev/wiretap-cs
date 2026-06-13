@@ -42,48 +42,54 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         _durationM2 += delta * delta2;
     }
 
-    public void StateItems(PushStateItem push)
+    public void StateItems(SchemaFeed<PushStateItem> push)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        push("item_count", ItemCount);
-
-        foreach (var (code, count) in _statusCounts)
+        push((name, next) =>
         {
-            push($"{code}_count", count);
-            push($"{code}_rate", RateOf(code));
-        }
+            next(name.Activity.State.Append("item_count"), ItemCount);
 
-        push("duration_ms", DurationMs);
-        push("duration_ms_mean", DurationMsMean);
-        push("duration_ms_min", DurationMsMin);
-        push("duration_ms_max", DurationMsMax);
-        push("duration_ms_std_dev", DurationMsStdDev);
-        push("throughput_s", ThroughputS);
+            foreach (var (code, count) in _statusCounts)
+            {
+                next(name.Activity.State.Append($"{code}_count"), count);
+                next(name.Activity.State.Append($"{code}_rate"), RateOf(code));
+            }
+
+            next(name.Activity.State.Append("duration_ms"), DurationMs);
+            next(name.Activity.State.Append("duration_ms_mean"), DurationMsMean);
+            next(name.Activity.State.Append("duration_ms_min"), DurationMsMin);
+            next(name.Activity.State.Append("duration_ms_max"), DurationMsMax);
+            next(name.Activity.State.Append("duration_ms_std_dev"), DurationMsStdDev);
+            next(name.Activity.State.Append("throughput_s"), ThroughputS);
+        });
     }
 
-    public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+    public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        foreach (var code in _statusCounts.Keys)
+        push((name, next) =>
         {
-            var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
-            push(
-                $"{label}: {{wiretap.activity.state.{code}_rate:P1}} ({{wiretap.activity.state.{code}_count}} of {{wiretap.activity.state.item_count}})",
-                RateOf(code),
-                _statusCounts[code],
-                ItemCount
-            );
-        }
+            foreach (var code in _statusCounts.Keys)
+            {
+                var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
+                next(
+                    $"{label}: {name.Activity.State.Append($"{code}_rate"):P1} ({name.Activity.State.Append($"{code}_count"):_} of {name.Activity.State.Append("item_count"):_})",
+                    RateOf(code),
+                    _statusCounts[code],
+                    ItemCount
+                );
+            }
 
-        push("Throughput: {wiretap.activity.state.throughput_s:N1}/s", ThroughputS);
+            next($"Throughput: {name.Activity.State.Append("throughput_s"):N1}/s", ThroughputS);
+        });
     }
 
     private double RateOf(string code)

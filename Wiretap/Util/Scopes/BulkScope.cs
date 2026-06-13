@@ -12,17 +12,17 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
 
     protected override string Role => "bulk";
 
-    public override void StateItems(PushStateItem push)
+    public override void StateItems(SchemaFeed<PushStateItem> push)
     {
         base.StateItems(push);
 
         foreach (var (key, value) in GetStateItems.From(Math))
         {
-            push($"wiretap.activity.state.{key}", value);
+            push((name, next) => next(key, value));
         }
     }
 
-    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
     {
         base.MessageParts(properties, push);
         Math.MessageParts(properties, push);

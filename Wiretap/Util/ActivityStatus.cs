@@ -37,12 +37,15 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Error;
 
-        public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+        public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
         {
-            if (Exception is not null)
+            push((name, next) =>
             {
-                push(Exception.Message);
-            }
+                if (Exception is not null)
+                {
+                    next(Exception.Message);
+                }
+            });
         }
     }
 
@@ -53,9 +56,9 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Warning;
 
-        public void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push)
+        public void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push)
         {
-            push("The activity scope exited without an explicit last status.");
+            push((name, next) => next("The activity scope exited without an explicit last status."));
         }
     }
 }
@@ -68,14 +71,17 @@ public abstract class ActivityStatus : IStateItemFeed
 
     public Exception? Exception { get; init; }
 
-    public virtual void StateItems(PushStateItem push)
+    public virtual void StateItems(SchemaFeed<PushStateItem> push)
     {
-        push("wiretap.activity.status.code", Code);
-        push("wiretap.activity.status.role", this switch
+        push((name, next) =>
         {
-            ActivityStatusRole.IFirst => "first",
-            ActivityStatusRole.ILast => "last",
-            _ => null
+            next(name.Activity.Status.Code, Code);
+            next(name.Activity.Status.Role, this switch
+            {
+                ActivityStatusRole.IFirst => "first",
+                ActivityStatusRole.ILast => "last",
+                _ => null
+            });
         });
     }
 }

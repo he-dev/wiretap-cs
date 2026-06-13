@@ -6,22 +6,24 @@ namespace Wiretap.Util.Buzz;
 
 public static class GetMessageParts
 {
-    private const string StatePrefix = "wiretap.activity.state";
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
     public static void From(IReadOnlyDictionary<string, object?> properties, PushMessagePart push, params object?[] sources)
     {
+        var root = Configuration.Current.PropertyName;
+        var pushSchemaFeed = new SchemaFeed<PushMessagePart>(feed => feed(root, push));
+
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(properties, source, push);
-                ByAttribute(source, push);
+                ByInterface(properties, source, pushSchemaFeed);
+                ByAttribute(root, source, push);
             }
         }
     }
 
-    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, PushMessagePart push)
+    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, SchemaFeed<PushMessagePart> push)
     {
         if (source is IMessagePartFeed messagePartFeed)
         {
@@ -29,7 +31,7 @@ public static class GetMessageParts
         }
     }
 
-    private static void ByAttribute<T>(T source, PushMessagePart push) where T : notnull
+    private static void ByAttribute<T>(PropertyName root, T source, PushMessagePart push) where T : notnull
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverMessageParts);
 
@@ -37,7 +39,7 @@ public static class GetMessageParts
         {
             if (getter.GetValue(source) is { } value)
             {
-                push(getter.Template(StatePrefix), value);
+                push(getter.Template(root.Activity.State), value);
             }
         }
     }
@@ -55,22 +57,22 @@ public static class GetMessageParts
         return [..messagePartGetters];
     }
 
-    private static string TemplateFor(string prefix, string propertyName, FeedToMessagePart attr)
+    private static string TemplateFor(PropertyName prefix, string propertyName, FeedToMessagePart attr)
     {
-        var key = $"{prefix}.{propertyName}";
+        var key = prefix.Append(propertyName);
 
         if (!attr.IncludeLabel)
         {
-            return $"{{{key}}}";
+            return $"{key:_}";
         }
 
         var label = attr.Label ?? propertyName;
-        return $"{label}{attr.Separator}{{{key}}}";
+        return $"{label}{attr.Separator}{key:_}";
     }
 
     private sealed record Getter(string PropertyName, FeedToMessagePart Attribute, Func<object, object?> GetValue)
     {
-        public string Template(string prefix)
+        public string Template(PropertyName prefix)
         {
             return TemplateFor(prefix, PropertyName, Attribute);
         }

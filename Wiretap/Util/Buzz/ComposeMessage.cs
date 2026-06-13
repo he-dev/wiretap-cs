@@ -13,5 +13,5 @@ public delegate void PushMessagePart([StructuredMessageTemplate] string? message
 
 public interface IMessagePartFeed
 {
-    void MessageParts(IReadOnlyDictionary<string, object?> properties, PushMessagePart push);
+    void MessageParts(IReadOnlyDictionary<string, object?> properties, SchemaFeed<PushMessagePart> push);
 }

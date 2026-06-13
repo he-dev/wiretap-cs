@@ -7,7 +7,7 @@ public record Configuration
 {
     public bool AttachTraceContext { get; init; }
 
-    public Func<PropertyName> NewPropertyName { get; init; } = () => new(Parts: ["wiretap"]);
+    public PropertyName PropertyName { get; init; } = new(Parts: ["wiretap"]);
 
     public IComposeMessage ComposeMessage { get; init; } = new ComposeMessageByAppending();
 
