@@ -81,7 +81,7 @@ public class ActivityHandle(System.Diagnostics.Activity activity) : IActivityHan
 
     public void Dispose()
     {
-        // note: Auto-stop. We do not know the status.
+        // note: Auto-stop without status because we do not know it.
         Stop(null);
     }
 }
