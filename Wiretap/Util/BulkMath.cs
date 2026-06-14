@@ -42,54 +42,48 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         _durationM2 += delta * delta2;
     }
 
-    public void StateItems(ItemFeed<PushStateItem> feed)
+    public void StateItems(PropertyName name, PushStateItem push)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        feed((name, next) =>
+        push(name.Activity.State.Append("item_count"), ItemCount);
+
+        foreach (var (code, count) in _statusCounts)
         {
-            next(name.Activity.State.Append("item_count"), ItemCount);
+            push(name.Activity.State.Append($"{code}_count"), count);
+            push(name.Activity.State.Append($"{code}_rate"), RateOf(code));
+        }
 
-            foreach (var (code, count) in _statusCounts)
-            {
-                next(name.Activity.State.Append($"{code}_count"), count);
-                next(name.Activity.State.Append($"{code}_rate"), RateOf(code));
-            }
-
-            next(name.Activity.State.Append("duration_ms"), DurationMs);
-            next(name.Activity.State.Append("duration_ms_mean"), DurationMsMean);
-            next(name.Activity.State.Append("duration_ms_min"), DurationMsMin);
-            next(name.Activity.State.Append("duration_ms_max"), DurationMsMax);
-            next(name.Activity.State.Append("duration_ms_std_dev"), DurationMsStdDev);
-            next(name.Activity.State.Append("throughput_s"), ThroughputS);
-        });
+        push(name.Activity.State.Append("duration_ms"), DurationMs);
+        push(name.Activity.State.Append("duration_ms_mean"), DurationMsMean);
+        push(name.Activity.State.Append("duration_ms_min"), DurationMsMin);
+        push(name.Activity.State.Append("duration_ms_max"), DurationMsMax);
+        push(name.Activity.State.Append("duration_ms_std_dev"), DurationMsStdDev);
+        push(name.Activity.State.Append("throughput_s"), ThroughputS);
     }
 
-    public void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
         if (ItemCount == 0)
         {
             return;
         }
 
-        feed((name, next) =>
+        foreach (var code in _statusCounts.Keys)
         {
-            foreach (var code in _statusCounts.Keys)
-            {
-                var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
-                next(
-                    $"{label}: {name.Activity.State.Append($"{code}_rate"):P1} ({name.Activity.State.Append($"{code}_count"):_} of {name.Activity.State.Append("item_count"):_})",
-                    RateOf(code),
-                    _statusCounts[code],
-                    ItemCount
-                );
-            }
+            var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
+            push(
+                $"{label}: {root.Activity.State.Append($"{code}_rate"):P1} ({root.Activity.State.Append($"{code}_count"):_} of {root.Activity.State.Append("item_count"):_})",
+                RateOf(code),
+                _statusCounts[code],
+                ItemCount
+            );
+        }
 
-            next($"Throughput: {name.Activity.State.Append("throughput_s"):N1}/s", ThroughputS);
-        });
+        push($"Throughput: {root.Activity.State.Append("throughput_s"):N1}/s", ThroughputS);
     }
 
     private double RateOf(string code)

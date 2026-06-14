@@ -12,20 +12,20 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
 
     protected override string Role => "bulk";
 
-    public override void StateItems(ItemFeed<PushStateItem> feed)
+    public override void StateItems(PropertyName name, PushStateItem push)
     {
-        base.StateItems(feed);
+        base.StateItems(name, push);
 
         foreach (var (key, value) in GetStateItems.From(Math))
         {
-            feed((name, next) => next(key, value));
+            push(key, value);
         }
     }
 
-    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        base.MessageParts(properties, feed);
-        Math.MessageParts(properties, feed);
+        base.MessageParts(root, get, push);
+        Math.MessageParts(root, get, push);
     }
 
     public ItemScope<TItem> BeginItem(TItem item)
@@ -44,4 +44,3 @@ public sealed class ItemScope<TActivity>
 {
     protected override string Role => "item";
 }
-

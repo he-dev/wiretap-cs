@@ -8,7 +8,7 @@ public delegate void PushStateItem(string key, object? value);
 
 public interface IStateItemFeed
 {
-    void StateItems(ItemFeed<PushStateItem> feed);
+    void StateItems(PropertyName name, PushStateItem push);
 }
 
 public static class GetStateItems
@@ -22,13 +22,12 @@ public static class GetStateItems
         var stateItems = new Dictionary<string, object?>();
         var root = Configuration.Current.PropertyName;
         var pushStateItem = new PushStateItem((key, value) => stateItems[key] = value);
-        var pushSchemaFeed = new ItemFeed<PushStateItem>(feed => feed(root, pushStateItem));
 
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(source, pushSchemaFeed);
+                ByInterface(root, source, pushStateItem);
                 ByAttribute(root, source, pushStateItem);
             }
         }
@@ -36,11 +35,11 @@ public static class GetStateItems
         return stateItems;
     }
 
-    private static void ByInterface(object source, ItemFeed<PushStateItem> push)
+    private static void ByInterface(PropertyName root, object source, PushStateItem push)
     {
         if (source is IStateItemFeed stateItemFeed)
         {
-            stateItemFeed.StateItems(push);
+            stateItemFeed.StateItems(root, push);
         }
     }
 

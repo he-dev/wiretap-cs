@@ -11,23 +11,23 @@ public static class GetMessageParts
     public static void From(IReadOnlyDictionary<string, object?> properties, PushMessagePart push, params object?[] sources)
     {
         var root = Configuration.Current.PropertyName;
-        var pushSchemaFeed = new ItemFeed<PushMessagePart>(feed => feed(root, push));
+        var get = new GetStateItem(name => properties.TryGetValue(name, out var value) ? value : null);
 
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(properties, source, pushSchemaFeed);
+                ByInterface(root, get, source, push);
                 ByAttribute(root, source, push);
             }
         }
     }
 
-    private static void ByInterface(IReadOnlyDictionary<string, object?> properties, object source, ItemFeed<PushMessagePart> push)
+    private static void ByInterface(PropertyName root, GetStateItem get, object source, PushMessagePart push)
     {
         if (source is IMessagePartFeed messagePartFeed)
         {
-            messagePartFeed.MessageParts(properties, push);
+            messagePartFeed.MessageParts(root, get, push);
         }
     }
 

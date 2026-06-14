@@ -14,10 +14,10 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
         scope.Log(status);
     }
 
-    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        base.MessageParts(properties, feed);
-        feed((name, next) => next("Duration: N/A"));
+        base.MessageParts(root, get, push);
+        push("Duration: N/A");
     }
 
     private void Log(ActivityStatus<TActivity> status)

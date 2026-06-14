@@ -47,10 +47,10 @@ public class BuzzScope<TActivity>
         _lastStatus = new(status, new LastStatusMessageFeed(message, args), duration);
     }
 
-    public override void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        base.MessageParts(properties, feed);
-        feed((name, next) => next($"Duration: {name.Activity.DurationMs:N0} ms", properties[name.Activity.DurationMs]));
+        base.MessageParts(root, get, push);
+        push($"Duration: {root.Activity.DurationMs:N0} ms", get(root.Activity.DurationMs));
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
@@ -111,8 +111,8 @@ public class BuzzScope<TActivity>
 
 public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
 {
-    public void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        feed((name, next) => next(message, args));
+        push(message, args);
     }
 }

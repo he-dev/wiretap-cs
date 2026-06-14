@@ -11,7 +11,9 @@ public interface IComposeMessage
 
 public delegate void PushMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
 
+public delegate object? GetStateItem(string name);
+
 public interface IMessagePartFeed
 {
-    void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed);
+    void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push);
 }

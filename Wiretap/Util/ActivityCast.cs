@@ -38,7 +38,7 @@ public sealed class ActivityCast(string name) : IStateItemFeed, IDisposable
         }
     }
 
-    public void StateItems(ItemFeed<PushStateItem> feed)
+    public void StateItems(PropertyName name, PushStateItem push)
     {
         if (!Configuration.Current.AttachTraceContext || Inner is not { } activity)
         {
@@ -46,16 +46,13 @@ public sealed class ActivityCast(string name) : IStateItemFeed, IDisposable
         }
 
         // core: Does not use the "name" because these properties should be in the root scope.
-        feed((name, push) =>
-        {
-            push("trace_id", activity.TraceId.ToString());
-            push("span_id", activity.SpanId.ToString());
+        push("trace_id", activity.TraceId.ToString());
+        push("span_id", activity.SpanId.ToString());
 
-            if (activity.ParentSpanId != default)
-            {
-                push("parent_span_id", activity.ParentSpanId.ToString());
-            }
-        });
+        if (activity.ParentSpanId != default)
+        {
+            push("parent_span_id", activity.ParentSpanId.ToString());
+        }
     }
 
     public static ActivityListener Listen()

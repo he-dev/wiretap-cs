@@ -17,26 +17,22 @@ public abstract class ActivityScope(string activityName) : IStateItemFeed, IMess
 
     protected abstract string Role { get; }
 
-    public virtual void MessageParts(IReadOnlyDictionary<string, object?> properties, ItemFeed<PushMessagePart> feed)
+    public virtual void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        feed((name, push) => push(
-            $"{name.Activity.Name:_}[{name.Activity.Status.Code:_}]",
-            properties[name.Activity.Name],
-            properties[name.Activity.Status.Code]
-        ));
+        push(
+            $"{root.Activity.Name:_}[{root.Activity.Status.Code:_}]",
+            get(root.Activity.Name),
+            get(root.Activity.Status.Code)
+        );
     }
 
-    public virtual void StateItems(ItemFeed<PushStateItem> feed)
+    public virtual void StateItems(PropertyName name, PushStateItem push)
     {
-        ActivityCast.StateItems(feed);
-
-        feed((name, push) =>
-        {
-            push(name.Activity.Name, ActivityName);
-            push(name.Activity.Role, Role);
-            push(name.Activity.Depth, Depth);
-            push(name.Activity.Path, Path);
-        });
+        ActivityCast.StateItems(name, push);
+        push(name.Activity.Name, ActivityName);
+        push(name.Activity.Role, Role);
+        push(name.Activity.Depth, Depth);
+        push(name.Activity.Path, Path);
     }
 
     internal virtual void Push()
@@ -66,8 +62,8 @@ internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed
     // core: Freezes the duration because the last activity may be logged later than set.
     public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
 
-    public void StateItems(ItemFeed<PushStateItem> feed)
+    public void StateItems(PropertyName name, PushStateItem push)
     {
-        feed((name, next) => next(name.Activity.DurationMs, (long)Duration.TotalMilliseconds));
+        push(name.Activity.DurationMs, (long)Duration.TotalMilliseconds);
     }
 }
