@@ -38,7 +38,7 @@ builder
 
 var app = builder.Build();
 
-var listener = CreateActivityListener.Default();
+var listener = ActivityCast.Listen();
 
 using (var scope = app.Services.CreateScope())
 {

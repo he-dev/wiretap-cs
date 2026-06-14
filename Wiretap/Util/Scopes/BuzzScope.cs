@@ -85,7 +85,7 @@ public class BuzzScope<TActivity>
         try
         {
             _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), null, Stopwatch.Elapsed);
-            ActivityWrapper.Stop(isOk: _lastStatus.Status switch
+            ActivityCast.Stop(isOk: _lastStatus.Status switch
             {
                 ActivityStatus<TActivity>.Okay => true,
                 ActivityStatus<TActivity>.Fail => false,

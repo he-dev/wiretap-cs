@@ -3,15 +3,21 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public sealed class ActivityWrapper(string name) : IStateItemFeed, IDisposable
+public sealed class ActivityCast(string name) : IStateItemFeed, IDisposable
 {
     private static readonly ActivitySource Source = new(nameof(Wiretap));
 
     private System.Diagnostics.Activity? Inner { get; } = Source.StartActivity(name);
 
-    public ActivityWrapper AddTag(string name, object value)
+    public static ActivityCast Start(string name) => new(name);
+
+    public ActivityCast Configure(Action<System.Diagnostics.Activity> configure)
     {
-        Inner?.AddTag(name, value);
+        if (Inner is not null)
+        {
+            configure(Inner);
+        }
+
         return this;
     }
 
@@ -52,12 +58,7 @@ public sealed class ActivityWrapper(string name) : IStateItemFeed, IDisposable
         });
     }
 
-    public void Dispose() => Inner?.Dispose();
-}
-
-public static class CreateActivityListener
-{
-    public static ActivityListener Default()
+    public static ActivityListener Listen()
     {
         var listener = new ActivityListener
         {
@@ -72,4 +73,6 @@ public static class CreateActivityListener
 
         return listener;
     }
+
+    public void Dispose() => Inner?.Dispose();
 }

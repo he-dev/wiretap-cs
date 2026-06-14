@@ -6,7 +6,8 @@ namespace Wiretap.Util;
 public abstract class ActivityScope(string activityName) : IStateItemFeed, IMessagePartFeed, IDisposable
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
-    protected ActivityWrapper ActivityWrapper { get; } = new(activityName);
+
+    protected ActivityCast ActivityCast { get; } = ActivityCast.Start(activityName);
 
     public int Depth => AmbientScope.Depth;
 
@@ -27,7 +28,7 @@ public abstract class ActivityScope(string activityName) : IStateItemFeed, IMess
 
     public virtual void StateItems(ItemFeed<PushStateItem> feed)
     {
-        ActivityWrapper.StateItems(feed);
+        ActivityCast.StateItems(feed);
 
         feed((name, push) =>
         {
@@ -45,7 +46,7 @@ public abstract class ActivityScope(string activityName) : IStateItemFeed, IMess
 
     public virtual void Dispose()
     {
-        ActivityWrapper.Dispose();
+        ActivityCast.Dispose();
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
     }
