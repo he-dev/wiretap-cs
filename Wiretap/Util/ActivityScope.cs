@@ -1,4 +1,6 @@
-﻿using Wiretap.Meta;
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
@@ -50,9 +52,43 @@ public abstract class ActivityScope(string activityName) : IStateItemFeed, IMess
 
 public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity.Name) where TActivity : Activity
 {
+    private static ConcurrentDictionary<Type, byte> CustomStatusWarnings { get; } = new();
+
     protected TActivity Activity => activity;
 
     protected IComposeMessage ComposeMessage => Configuration.Current.ComposeMessage;
+
+    protected void WarnIfCustomStatusName(ActivityStatus<TActivity> status)
+    {
+        if (status.GetType().Name == status.Code)
+        {
+            return;
+        }
+
+        if (!CustomStatusWarnings.TryAdd(status.GetType(), 0))
+        {
+            return;
+        }
+
+        var statusName = $"{ActivityName}.{status.GetType().Name}";
+        var canonicalName = $"{ActivityName}.{status.Code}";
+        Configuration.Current.Logger?.LogWarning(
+            "{StatusName} will be logged as {CanonicalName} because only canonical status names are allowed. Rename {StatusNameToRename} to {CanonicalNameToUse} to get rid of this warning.",
+            statusName,
+            canonicalName,
+            statusName,
+            canonicalName
+        );
+    }
+
+    public override void StateItems(PropertyName name, PushStateItem push)
+    {
+        base.StateItems(name, push);
+        if (Activity.Tags.Length > 0)
+        {
+            push(name.Activity.Tags, Activity.Tags);
+        }
+    }
 }
 
 internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed

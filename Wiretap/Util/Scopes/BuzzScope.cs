@@ -30,14 +30,14 @@ public class BuzzScope<TActivity>
 
         if (_lastStatus is { } lastStatus)
         {
-            var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration), activity, status);
+            var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration), Activity, status);
             var name = Configuration.Current.PropertyName;
 
             using (logger.BeginScope(state))
             {
                 logger.LogWarning(
                     $"{name.Activity.Name:_} status changed from [{name.Activity.State.Append("status", "code", "old"):_}] to [{name.Activity.State.Append("status", "code", "new"):_}] before scope exit.",
-                    activity.Name,
+                    Activity.Name,
                     lastStatus.Status.Code,
                     status.Code
                 );
@@ -55,12 +55,13 @@ public class BuzzScope<TActivity>
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
     {
+        WarnIfCustomStatusName(status);
         duration ??= Stopwatch.Elapsed;
-        var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration.Value), activity, status);
+        var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration.Value), Activity, status);
 
         using (logger.BeginScope(state))
         {
-            var template = ComposeMessage.From(state, this, activity, status, suffix);
+            var template = ComposeMessage.From(state, this, Activity, status, suffix);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
     }

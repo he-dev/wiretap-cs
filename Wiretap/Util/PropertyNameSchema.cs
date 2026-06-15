@@ -42,6 +42,8 @@ public static class PropertyNameExtensions
 
         public PropertyName Name => name.Append("name");
 
+        public PropertyName Tags => name.Append("tags");
+
         public PropertyName Role => name.Append("role");
 
         public PropertyName Code => name.Append("code");

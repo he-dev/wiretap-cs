@@ -27,6 +27,8 @@ public abstract class Workflow
 
 public class DeleteFile : Activity.Buzz
 {
+    public override string[] Tags { get; init; } = ["io"];
+
     [FeedToMessagePart]
     public required string Path { get; init; }
 

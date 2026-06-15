@@ -20,6 +20,8 @@ public abstract class Activity
 
     public virtual string Name { get; }
 
+    public virtual string[] Tags { get; init; } = [];
+
     public abstract class Buzz : Activity;
 
     public abstract class Bulk : Buzz

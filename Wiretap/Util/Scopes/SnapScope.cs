@@ -22,16 +22,17 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
 
     private void Log(ActivityStatus<TActivity> status)
     {
+        WarnIfCustomStatusName(status);
         var properties = GetStateItems.From(
             this,
             new ActivityDurationFeed.Zero(),
-            activity,
+            Activity,
             status
         );
 
         using (logger.BeginScope(properties))
         {
-            var template = ComposeMessage.From(properties, this, activity, status);
+            var template = ComposeMessage.From(properties, this, Activity, status);
             logger.Log(status.Level, status.Exception, template.Template, template.Args);
         }
 
