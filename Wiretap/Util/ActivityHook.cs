@@ -13,7 +13,7 @@ public interface IActivityHandle : IDisposable
     void Stop(bool? ok);
 }
 
-public class ActivityHook(string sourceName = nameof(Wiretap)) : IActivityHook, IStateItemFeed
+public class ActivityHook(string sourceName = nameof(Wiretap)) : IActivityHook, ILogPropertyFeed
 {
     private ActivitySource Source { get; } = new(sourceName);
 
@@ -24,7 +24,7 @@ public class ActivityHook(string sourceName = nameof(Wiretap)) : IActivityHook, 
         return Source.StartActivity(name) is { } activity ? new ActivityHandle(activity) : null;
     }
 
-    public void StateItems(PropertyName name, PushStateItem push)
+    public void LogProperties(PropertyName name, PushLogProperty push)
     {
         if (!AttachTraceContext || System.Diagnostics.Activity.Current is not { } activity)
         {

@@ -3,7 +3,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public sealed class ActivityCast(string name) : IStateItemFeed, IDisposable
+public sealed class ActivityCast(string name) : ILogPropertyFeed, IDisposable
 {
     private static readonly ActivitySource Source = new(nameof(Wiretap));
 
@@ -38,7 +38,7 @@ public sealed class ActivityCast(string name) : IStateItemFeed, IDisposable
         }
     }
 
-    public void StateItems(PropertyName name, PushStateItem push)
+    public void LogProperties(PropertyName name, PushLogProperty push)
     {
         if (!Configuration.Current.AttachTraceContext || Inner is not { } activity)
         {

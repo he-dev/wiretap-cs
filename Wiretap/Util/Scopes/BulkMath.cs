@@ -3,7 +3,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
+public sealed class BulkMath : ILogPropertyFeed, IMessagePartFeed
 {
     private readonly Dictionary<string, int> _statusCounts = new(StringComparer.Ordinal);
     private double _durationMean;
@@ -42,7 +42,7 @@ public sealed class BulkMath : IStateItemFeed, IMessagePartFeed
         _durationM2 += delta * delta2;
     }
 
-    public void StateItems(PropertyName name, PushStateItem push)
+    public void LogProperties(PropertyName name, PushLogProperty push)
     {
         if (ItemCount == 0)
         {

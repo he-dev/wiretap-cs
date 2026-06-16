@@ -4,11 +4,11 @@ using System.Reflection;
 
 namespace Wiretap.Util.Buzz;
 
-public delegate void PushStateItem(string key, object? value);
+public delegate void PushLogProperty(string key, object? value);
 
-public interface IStateItemFeed
+public interface ILogPropertyFeed
 {
-    void StateItems(PropertyName name, PushStateItem push);
+    void LogProperties(PropertyName name, PushLogProperty push);
 }
 
 public static class GetStateItems
@@ -21,7 +21,7 @@ public static class GetStateItems
 
         var stateItems = new Dictionary<string, object?>();
         var root = Configuration.Current.PropertyName;
-        var pushStateItem = new PushStateItem((key, value) => stateItems[key] = value);
+        var pushStateItem = new PushLogProperty((key, value) => stateItems[key] = value);
 
         foreach (var source in sources)
         {
@@ -35,15 +35,15 @@ public static class GetStateItems
         return stateItems;
     }
 
-    private static void ByInterface(PropertyName root, object source, PushStateItem push)
+    private static void ByInterface(PropertyName root, object source, PushLogProperty push)
     {
-        if (source is IStateItemFeed stateItemFeed)
+        if (source is ILogPropertyFeed logPropertyFeed)
         {
-            stateItemFeed.StateItems(root, push);
+            logPropertyFeed.LogProperties(root, push);
         }
     }
 
-    private static void ByAttribute<T>(PropertyName root, T source, PushStateItem push) where T : notnull
+    private static void ByAttribute<T>(PropertyName root, T source, PushLogProperty push) where T : notnull
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
 
@@ -62,7 +62,7 @@ public static class GetStateItems
 
         var stateItemGetters =
             from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<ScopeStateItem>()
+            let attr = property.GetCustomAttribute<StateItem>()
             where attr is not null
             select new Getter(attr.Name ?? property.Name, Getter.Compile(type, property));
 
@@ -75,7 +75,7 @@ public static class GetStateItems
         {
             if (!property.CanRead)
             {
-                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(ScopeStateItem)}' but does not have a getter.");
+                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(StateItem)}' but does not have a getter.");
             }
 
             var source = Expression.Parameter(typeof(object), "source");

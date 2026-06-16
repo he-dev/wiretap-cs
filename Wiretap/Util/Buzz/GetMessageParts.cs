@@ -50,27 +50,27 @@ public static class GetMessageParts
 
         var messagePartGetters =
             from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<FeedToMessagePart>()
+            let attr = property.GetCustomAttribute<MessagePart>()
             where attr is not null
             select new Getter(property.Name, attr, Getter.Compile(type, property));
 
         return [..messagePartGetters];
     }
 
-    private static string TemplateFor(PropertyName prefix, string propertyName, FeedToMessagePart attr)
+    private static string TemplateFor(PropertyName prefix, string propertyName, MessagePart attr)
     {
         var key = prefix.Append(propertyName);
 
-        if (!attr.IncludeLabel)
+        if (attr.Label is null)
         {
             return $"{key:_}";
         }
 
-        var label = attr.Label ?? propertyName;
+        var label = attr.Label == string.Empty ? propertyName : attr.Label;
         return $"{label}{attr.Separator}{key:_}";
     }
 
-    private sealed record Getter(string PropertyName, FeedToMessagePart Attribute, Func<object, object?> GetValue)
+    private sealed record Getter(string PropertyName, MessagePart Attribute, Func<object, object?> GetValue)
     {
         public string Template(PropertyName prefix)
         {
@@ -81,7 +81,7 @@ public static class GetMessageParts
         {
             if (!property.CanRead)
             {
-                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(FeedToMessagePart)}' but does not have a getter.");
+                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(MessagePart)}' but does not have a getter.");
             }
 
             var source = Expression.Parameter(typeof(object), "source");

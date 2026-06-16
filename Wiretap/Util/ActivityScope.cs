@@ -5,7 +5,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope(string activityName) : IStateItemFeed, IMessagePartFeed, IDisposable
+public abstract class ActivityScope(string activityName) : ILogPropertyFeed, IMessagePartFeed, IDisposable
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
@@ -28,9 +28,9 @@ public abstract class ActivityScope(string activityName) : IStateItemFeed, IMess
         );
     }
 
-    public virtual void StateItems(PropertyName name, PushStateItem push)
+    public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {
-        ActivityCast.StateItems(name, push);
+        ActivityCast.LogProperties(name, push);
         push(name.Activity.Name, ActivityName);
         push(name.Activity.Role, Role);
         push(name.Activity.Depth, Depth);
@@ -81,9 +81,9 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
         );
     }
 
-    public override void StateItems(PropertyName name, PushStateItem push)
+    public override void LogProperties(PropertyName name, PushLogProperty push)
     {
-        base.StateItems(name, push);
+        base.LogProperties(name, push);
         if (Activity.Tags.Length > 0)
         {
             push(name.Activity.Tags, Activity.Tags);
@@ -91,14 +91,14 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
     }
 }
 
-internal record ActivityDurationFeed(TimeSpan Duration) : IStateItemFeed
+internal record ActivityDurationFeed(TimeSpan Duration) : ILogPropertyFeed
 {
     public sealed record Zero() : ActivityDurationFeed(TimeSpan.Zero);
 
     // core: Freezes the duration because the last activity may be logged later than set.
     public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
 
-    public void StateItems(PropertyName name, PushStateItem push)
+    public void LogProperties(PropertyName name, PushLogProperty push)
     {
         push(name.Activity.DurationMs, (long)Duration.TotalMilliseconds);
     }

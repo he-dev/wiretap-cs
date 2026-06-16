@@ -12,9 +12,9 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
 
     protected override string Role => "bulk";
 
-    public override void StateItems(PropertyName name, PushStateItem push)
+    public override void LogProperties(PropertyName name, PushLogProperty push)
     {
-        base.StateItems(name, push);
+        base.LogProperties(name, push);
 
         foreach (var (key, value) in GetStateItems.From(Math))
         {

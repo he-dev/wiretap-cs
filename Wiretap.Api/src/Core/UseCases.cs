@@ -11,12 +11,12 @@ public abstract class Workflow
     {
         public class Now : ExecuteStep
         {
-            [ScopeStateItem]
+            [StateItem]
             public required int StepIndex { get; init; }
 
             public sealed class Okay : ActivityStatus<Now>.Okay
             {
-                [ScopeStateItem]
+                [StateItem]
                 public required int ItemsProcessed { get; init; }
             }
 
@@ -29,7 +29,7 @@ public class DeleteFile : Activity.Buzz
 {
     public override string[] Tags { get; init; } = ["io"];
 
-    [FeedToMessagePart]
+    [MessagePart]
     public required string Path { get; init; }
 
     public class Noop : ActivityStatus<DeleteFile>.Noop, IMessagePartFeed
@@ -54,7 +54,7 @@ public class DeleteFile : Activity.Buzz
 
 public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(StatusLogPolicy.Last)
 {
-    [FeedToMessagePart]
+    [MessagePart]
     public required string Path { get; init; }
 
     public sealed class Okay : ActivityStatus<DeleteFolder>.Okay;
@@ -64,7 +64,7 @@ public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(StatusLogP
 
 public class ValidateRecord : Activity.Snap
 {
-    [FeedToStateItem]
+    [StateItem]
     public required string RecordId { get; init; }
 
     public sealed class Okay : ActivityStatus<ValidateRecord>.Okay;
@@ -74,12 +74,12 @@ public class ValidateRecord : Activity.Snap
     public sealed class Fail : ActivityStatus<ValidateRecord>.Fail;
 }
 
-public class CopyFile : Activity.Buzz, IStateItemFeed
+public class CopyFile : Activity.Buzz, ILogPropertyFeed
 {
-    [ScopeStateItem]
+    [StateItem]
     public required string Path { get; init; }
 
-    public void StateItems(PropertyName name, PushStateItem push)
+    public void LogProperties(PropertyName name, PushLogProperty push)
     {
         push(name.Activity.State.Append("CustomItem"), "CustomValue");
     }

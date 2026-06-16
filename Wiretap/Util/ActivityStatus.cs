@@ -60,7 +60,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
     }
 }
 
-public abstract class ActivityStatus : IStateItemFeed
+public abstract class ActivityStatus : ILogPropertyFeed
 {
     public abstract string Code { get; }
 
@@ -68,7 +68,7 @@ public abstract class ActivityStatus : IStateItemFeed
 
     public Exception? Exception { get; init; }
 
-    public virtual void StateItems(PropertyName name, PushStateItem push)
+    public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {
         push(name.Activity.Status.Code, Code);
         push(name.Activity.Status.Role, this switch
