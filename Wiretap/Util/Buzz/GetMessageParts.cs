@@ -15,7 +15,7 @@ public static class GetMessageParts
         params object?[] sources
     )
     {
-        var get = new GetStateItem(name => properties.TryGetValue(name, out var value) ? value : null);
+        var get = new GetLogProperty(name => properties.TryGetValue(name, out var value) ? value : null);
 
         foreach (var source in sources)
         {
@@ -27,7 +27,7 @@ public static class GetMessageParts
         }
     }
 
-    private static void ByInterface(PropertyName root, GetStateItem get, object source, PushMessagePart push)
+    private static void ByInterface(PropertyName root, GetLogProperty get, object source, PushMessagePart push)
     {
         if (source is IMessagePartFeed messagePartFeed)
         {

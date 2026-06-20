@@ -1,4 +1,3 @@
-using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Wiretap.Util.Buzz;
 
@@ -17,14 +16,13 @@ public class BuzzScope<TActivity>
     private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
     private Snapshot? _lastStatus;
     private TimeSpan? _logDuration;
-    private IMessagePartFeed? _logMessage;
     private bool _disposed;
 
     protected ILogger Logger => logger;
 
     protected override string Role => "buzz";
 
-    public void SetStatus(ActivityStatus<TActivity> status, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    public void SetStatus(ActivityStatus<TActivity> status)
     {
         // note: Makes sure everyone uses the same value.
         var duration = Stopwatch.Elapsed;
@@ -32,7 +30,7 @@ public class BuzzScope<TActivity>
         if (_lastStatus is { } lastStatus)
         {
             var name = Variant.CreateLogEntryBy.Root;
-            var state = GetStateItems.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
+            var state = GetLogPropertys.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
 
             using (logger.BeginScope(state))
             {
@@ -45,10 +43,10 @@ public class BuzzScope<TActivity>
             }
         }
 
-        _lastStatus = new(status, new LastStatusMessageFeed(message, args), duration);
+        _lastStatus = new(status, duration);
     }
 
-    public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    public override void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         base.MessageParts(root, get, push);
         push(
@@ -56,7 +54,6 @@ public class BuzzScope<TActivity>
             $"Duration: {root.Activity.DurationMs:N0} ms",
             get(root.Activity.DurationMs)
         );
-        _logMessage?.MessageParts(root, get, push);
     }
 
     public override void LogProperties(PropertyName name, PushLogProperty push)
@@ -65,11 +62,10 @@ public class BuzzScope<TActivity>
         push(name.Activity.DurationMs, (long)(_logDuration ?? Stopwatch.Elapsed).TotalMilliseconds);
     }
 
-    private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
+    private void LogStatus(ActivityStatus<TActivity> status, TimeSpan? duration = null)
     {
         WarnIfCustomStatusName(status);
         _logDuration = duration ?? Stopwatch.Elapsed;
-        _logMessage = suffix;
         try
         {
             logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
@@ -77,7 +73,6 @@ public class BuzzScope<TActivity>
         finally
         {
             _logDuration = null;
-            _logMessage = null;
         }
     }
 
@@ -100,7 +95,7 @@ public class BuzzScope<TActivity>
 
         try
         {
-            _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), null, Stopwatch.Elapsed);
+            _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), Stopwatch.Elapsed);
             TraceHandle.Stop(ok: _lastStatus.Status switch
             {
                 ActivityStatus<TActivity>.Okay => true,
@@ -110,7 +105,7 @@ public class BuzzScope<TActivity>
 
             if (statusLogPolicy.HasFlag(StatusLogPolicy.Last))
             {
-                LogStatus(_lastStatus.Status, _lastStatus.Message, _lastStatus.Duration);
+                LogStatus(_lastStatus.Status, _lastStatus.Duration);
             }
 
             onLastStatus?.Invoke(_lastStatus.Status, _lastStatus.Duration);
@@ -122,13 +117,5 @@ public class BuzzScope<TActivity>
         }
     }
 
-    private record Snapshot(ActivityStatus<TActivity> Status, IMessagePartFeed? Message, TimeSpan Duration);
-}
-
-public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, params object?[] args) : IMessagePartFeed
-{
-    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
-    {
-        push(root.Activity.Status.Append("suffix"), message, args);
-    }
+    private record Snapshot(ActivityStatus<TActivity> Status, TimeSpan Duration);
 }

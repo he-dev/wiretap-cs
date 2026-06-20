@@ -36,7 +36,7 @@ public class DeleteFile : Activity.Buzz
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(
                 root.Activity.State.Append("Reason"),

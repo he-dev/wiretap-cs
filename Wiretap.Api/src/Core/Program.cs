@@ -68,7 +68,7 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        bulk.SetStatus(new Wires.DeleteFolder.Okay(), "This is the end of this bulk delete.");
+        bulk.SetStatus(new Wires.DeleteFolder.Okay());
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 

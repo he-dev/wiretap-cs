@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -11,7 +11,7 @@ public interface ILogPropertySource
     void LogProperties(PropertyName name, PushLogProperty push);
 }
 
-public static class GetStateItems
+public static class GetLogPropertys
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 

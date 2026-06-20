@@ -31,35 +31,25 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
     }
 
     // core: An error occurred.
-    public abstract class Fail : ActivityStatus<TActivity>, IMessagePartFeed, ActivityStatusRole.ILast
+    public abstract class Fail : ActivityStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Fail);
 
         public override LogLevel Level => LogLevel.Error;
 
-        public virtual void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
-        {
-            if (Exception is not null)
-            {
-                push(root.Activity.Status.Append("exception"), Exception.Message);
-            }
-        }
+        [MessagePart("Exception")]
+        public string? ExceptionMessage => Exception?.Message;
     }
 
     // core: Framework fallback when a buzz exits without an explicit last status.
-    internal sealed class Void : ActivityStatus<TActivity>, IMessagePartFeed, ActivityStatusRole.ILast
+    internal sealed class Void : ActivityStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Void);
 
         public override LogLevel Level => LogLevel.Warning;
 
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
-        {
-            push(
-                root.Activity.Status.Append("message"),
-                "The activity scope exited without an explicit last status."
-            );
-        }
+        [MessagePart]
+        public string Reason => "The activity scope exited without an explicit last status.";
     }
 }
 

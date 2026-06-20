@@ -9,8 +9,8 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;
 
-    // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
-    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    // core: Quick contracts carry their optional structured message as contract data.
+    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         push(root.Activity.Append("message"), message, args);
     }
@@ -18,7 +18,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickBuzz>.Okay, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
@@ -27,19 +27,17 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickBuzz>.Noop, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBuzz>.Fail
+        : ActivityStatus<QuickBuzz>.Fail, IMessagePartFeed
     {
-        public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
-            base.MessageParts(root, get, push);
             push(root.Activity.Status.Append("message"), message, args);
         }
     }
@@ -51,8 +49,8 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;
 
-    // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
-    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    // core: Quick contracts carry their optional structured message as contract data.
+    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         push(root.Activity.Append("message"), message, args);
     }
@@ -60,7 +58,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickSnap>.Okay, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
@@ -69,19 +67,17 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickSnap>.Noop, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickSnap>.Fail
+        : ActivityStatus<QuickSnap>.Fail, IMessagePartFeed
     {
-        public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
-            base.MessageParts(root, get, push);
             push(root.Activity.Status.Append("message"), message, args);
         }
     }
@@ -95,8 +91,8 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
 
     public override StatusLogPolicy StatusLogPolicy { get; init; } = StatusLogPolicy.Last;
 
-    // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
-    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    // core: Quick contracts carry their optional structured message as contract data.
+    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         push(root.Activity.Append("message"), message, args);
     }
@@ -104,7 +100,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickBulk>.Okay, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
@@ -113,19 +109,17 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
         : ActivityStatus<QuickBulk>.Noop, IMessagePartFeed
     {
-        public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBulk>.Fail
+        : ActivityStatus<QuickBulk>.Fail, IMessagePartFeed
     {
-        public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
-            base.MessageParts(root, get, push);
             push(root.Activity.Status.Append("message"), message, args);
         }
     }

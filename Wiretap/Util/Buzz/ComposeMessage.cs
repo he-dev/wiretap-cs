@@ -8,9 +8,9 @@ public delegate void PushMessagePart(
     params object?[] args
 );
 
-public delegate object? GetStateItem(string name);
+public delegate object? GetLogProperty(string name);
 
 public interface IMessagePartFeed
 {
-    void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push);
+    void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push);
 }

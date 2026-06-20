@@ -10,7 +10,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IMe
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
-    protected ITraceHandle TraceHandle => Configuration.TraceContext.Start(Activity.Name);
+    protected ITraceHandle TraceHandle { get; } = Configuration.TraceContext.Start(activity.Name);
 
     protected Configuration.Variant Variant { get; } = Configuration.Resolve(activity);
 
@@ -30,7 +30,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IMe
 
     protected abstract string Role { get; }
 
-    public virtual void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    public virtual void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         push(
             root.Activity.Name,

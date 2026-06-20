@@ -1,7 +1,7 @@
 using System.Globalization;
 using Wiretap.Util.Buzz;
 
-namespace Wiretap.Util;
+namespace Wiretap.Util.Scopes;
 
 public sealed class BulkMath : ILogPropertySource, IMessagePartFeed
 {
@@ -65,7 +65,7 @@ public sealed class BulkMath : ILogPropertySource, IMessagePartFeed
         push(name.Activity.State.Append("throughput_s"), ThroughputS);
     }
 
-    public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
+    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
         if (ItemCount == 0)
         {
