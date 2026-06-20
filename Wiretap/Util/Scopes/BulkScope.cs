@@ -16,7 +16,7 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
     {
         base.LogProperties(name, push);
 
-        foreach (var (key, value) in GetStateItems.From(Math))
+        foreach (var (key, value) in GetStateItems.From(name, Math))
         {
             push(key, value);
         }

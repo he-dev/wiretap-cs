@@ -3,7 +3,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public sealed class BulkMath : ILogPropertyFeed, IMessagePartFeed
+public sealed class BulkMath : ILogPropertySource, IMessagePartFeed
 {
     private readonly Dictionary<string, int> _statusCounts = new(StringComparer.Ordinal);
     private double _durationMean;

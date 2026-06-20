@@ -17,6 +17,8 @@ public class BuzzScope<TActivity>
 {
     private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
     private Snapshot? _lastStatus;
+    private TimeSpan? _logDuration;
+    private IMessagePartFeed? _logMessage;
     private bool _disposed;
 
     protected ILogger Logger => logger;
@@ -30,8 +32,8 @@ public class BuzzScope<TActivity>
 
         if (_lastStatus is { } lastStatus)
         {
-            var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration), Activity, status);
-            var name = Configuration.Current.PropertyName;
+            var name = Variant.CreateLogEntryBy.Root;
+            var state = GetStateItems.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
 
             using (logger.BeginScope(state))
             {
@@ -55,18 +57,28 @@ public class BuzzScope<TActivity>
             $"Duration: {root.Activity.DurationMs:N0} ms",
             get(root.Activity.DurationMs)
         );
+        _logMessage?.MessageParts(root, get, push);
+    }
+
+    public override void LogProperties(PropertyName name, PushLogProperty push)
+    {
+        base.LogProperties(name, push);
+        push(name.Activity.DurationMs, (long)(_logDuration ?? Stopwatch.Elapsed).TotalMilliseconds);
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
     {
         WarnIfCustomStatusName(status);
-        duration ??= Stopwatch.Elapsed;
-        var state = GetStateItems.From(this, ActivityDurationFeed.Freeze(duration.Value), Activity, status);
-
-        using (logger.BeginScope(state))
+        _logDuration = duration ?? Stopwatch.Elapsed;
+        _logMessage = suffix;
+        try
         {
-            var template = ComposeMessage.From(state, this, Activity, status, suffix);
-            logger.Log(status.Level, status.Exception, template.Template, template.Args);
+            logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
+        }
+        finally
+        {
+            _logDuration = null;
+            _logMessage = null;
         }
     }
 
@@ -90,7 +102,7 @@ public class BuzzScope<TActivity>
         try
         {
             _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), null, Stopwatch.Elapsed);
-            ActivityCast.Stop(isOk: _lastStatus.Status switch
+            TraceHandle.Stop(ok: _lastStatus.Status switch
             {
                 ActivityStatus<TActivity>.Okay => true,
                 ActivityStatus<TActivity>.Fail => false,

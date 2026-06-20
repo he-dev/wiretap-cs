@@ -6,7 +6,7 @@ namespace Wiretap.Util.Buzz;
 
 public delegate void PushLogProperty(string key, object? value);
 
-public interface ILogPropertyFeed
+public interface ILogPropertySource
 {
     void LogProperties(PropertyName name, PushLogProperty push);
 }
@@ -14,9 +14,6 @@ public interface ILogPropertyFeed
 public static class GetStateItems
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
-
-    public static Dictionary<string, object?> From(params object?[] sources) =>
-        From(Configuration.Current.PropertyName, sources);
 
     public static Dictionary<string, object?> From(PropertyName root, params object?[] sources)
     {
@@ -39,7 +36,7 @@ public static class GetStateItems
 
     private static void ByInterface(PropertyName root, object source, PushLogProperty push)
     {
-        if (source is ILogPropertyFeed logPropertyFeed)
+        if (source is ILogPropertySource logPropertyFeed)
         {
             logPropertyFeed.LogProperties(root, push);
         }

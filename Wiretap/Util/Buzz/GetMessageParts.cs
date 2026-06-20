@@ -9,13 +9,6 @@ public static class GetMessageParts
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
     public static void From(
-        IReadOnlyDictionary<string, object?> properties,
-        PushMessagePart push,
-        params object?[] sources
-    ) =>
-        From(Configuration.Current.PropertyName, properties, push, sources);
-
-    public static void From(
         PropertyName root,
         IReadOnlyDictionary<string, object?> properties,
         PushMessagePart push,

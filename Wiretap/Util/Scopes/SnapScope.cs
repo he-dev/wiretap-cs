@@ -20,23 +20,18 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
         push(root.Activity.DurationMs, "Duration: N/A");
     }
 
+    public override void LogProperties(PropertyName name, PushLogProperty push)
+    {
+        base.LogProperties(name, push);
+        push(name.Activity.DurationMs, 0L);
+    }
+
     private void Log(ActivityStatus<TActivity> status)
     {
         WarnIfCustomStatusName(status);
-        var properties = GetStateItems.From(
-            this,
-            new ActivityDurationFeed.Zero(),
-            Activity,
-            status
-        );
+        logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
 
-        using (logger.BeginScope(properties))
-        {
-            var template = ComposeMessage.From(properties, this, Activity, status);
-            logger.Log(status.Level, status.Exception, template.Template, template.Args);
-        }
-
-        ActivityCast.Stop(isOk: status switch
+        TraceHandle.Stop(ok: status switch
         {
             ActivityStatus<TActivity>.Okay => true,
             ActivityStatus<TActivity>.Fail => false,

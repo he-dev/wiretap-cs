@@ -8,6 +8,8 @@ public sealed class CreateLogEntry
     private readonly Func<MessageContext, IReadOnlyList<MessagePartMap.Entry>> _arrangeMessageParts;
     private readonly Func<IReadOnlyList<MessagePartMap.Entry>, MessageTemplate> _joinMessageParts;
 
+    public PropertyName Root => _root;
+
     private CreateLogEntry
     (
         PropertyName root,
@@ -48,7 +50,7 @@ public sealed class CreateLogEntry
 
         foreach (var source in new object[] { scope, scope.Activity, status })
         {
-            if (source is ILogPropertyFeed feed)
+            if (source is ILogPropertySource feed)
             {
                 feed.LogProperties(_root, push);
             }

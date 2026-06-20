@@ -6,19 +6,15 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope : ILogPropertyFeed, IMessagePartFeed, IDisposable, IEnumerable<ActivityScope>
+public abstract class ActivityScope(Activity activity) : ILogPropertySource, IMessagePartFeed, IDisposable, IEnumerable<ActivityScope>
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
-    protected ActivityScope(Activity activity)
-    {
-        Activity = activity;
-        ActivityCast = ActivityCast.Start(activity.Name);
-    }
+    protected ITraceHandle TraceHandle => Configuration.TraceContext.Start(Activity.Name);
 
-    protected ActivityCast ActivityCast { get; }
+    protected Configuration.Variant Variant { get; } = Configuration.Resolve(activity);
 
-    public Activity Activity { get; }
+    public Activity Activity { get; } = activity;
 
     public ActivityScope? Parent { get; private set; }
 
@@ -46,7 +42,7 @@ public abstract class ActivityScope : ILogPropertyFeed, IMessagePartFeed, IDispo
 
     public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {
-        ActivityCast.LogProperties(name, push);
+        TraceHandle.LogProperties(name, push);
         push(name.Activity.Name, ActivityName);
         push(name.Activity.Role, Role);
         push(name.Activity.Depth, Depth);
@@ -61,7 +57,7 @@ public abstract class ActivityScope : ILogPropertyFeed, IMessagePartFeed, IDispo
 
     public virtual void Dispose()
     {
-        ActivityCast.Dispose();
+        TraceHandle.Dispose();
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -84,8 +80,6 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
 
     public new TActivity Activity => (TActivity)base.Activity;
 
-    protected IComposeMessage ComposeMessage => Configuration.Current.ComposeMessage;
-
     protected void WarnIfCustomStatusName(ActivityStatus<TActivity> status)
     {
         if (status.GetType().Name == status.Code)
@@ -100,7 +94,7 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
 
         var statusName = $"{ActivityName}.{status.GetType().Name}";
         var canonicalName = $"{ActivityName}.{status.Code}";
-        Configuration.Current.Logger?.LogWarning(
+        Configuration.DiagnosticLogger.LogWarning(
             "{StatusName} will be logged as {CanonicalName} because only canonical status names are allowed. Rename {StatusNameToRename} to {CanonicalNameToUse} to get rid of this warning.",
             statusName,
             canonicalName,
@@ -119,12 +113,12 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
     }
 }
 
-internal record ActivityDurationFeed(TimeSpan Duration) : ILogPropertyFeed
+internal record ActivityDurationSource(TimeSpan Duration) : ILogPropertySource
 {
-    public sealed record Zero() : ActivityDurationFeed(TimeSpan.Zero);
+    public sealed record Zero() : ActivityDurationSource(TimeSpan.Zero);
 
     // core: Freezes the duration because the last activity may be logged later than set.
-    public static ActivityDurationFeed Freeze(TimeSpan duration) => new(duration);
+    public static ActivityDurationSource Freeze(TimeSpan duration) => new(duration);
 
     public void LogProperties(PropertyName name, PushLogProperty push)
     {

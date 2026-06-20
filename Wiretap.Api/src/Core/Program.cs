@@ -38,15 +38,14 @@ builder
 
 var app = builder.Build();
 
-var listener = ActivityCast.Listen();
-
 using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase) ? 10_000 : 1;
 
-    using var _ = Wiretap.Util.Configuration.Push(loggerFactory, c => c with { AttachTraceContext = true, ComposeMessage = new ComposeMessageByAppending() });
+    Wiretap.Util.Configuration.UseDiagnosticsLogger(loggerFactory);
+    using var _ = Wiretap.Util.Configuration.TraceContext.Listen();
     using (var bulk = logger.BeginBulk(new Wires.DeleteFolder { Path = "batch" }))
     {
         for (var i = 0; i < loopCount; i++)

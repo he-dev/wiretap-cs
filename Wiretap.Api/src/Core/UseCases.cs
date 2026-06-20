@@ -78,7 +78,7 @@ public class ValidateRecord : Activity.Snap
     public sealed class Fail : ActivityStatus<ValidateRecord>.Fail;
 }
 
-public class CopyFile : Activity.Buzz, ILogPropertyFeed
+public class CopyFile : Activity.Buzz, ILogPropertySource
 {
     [StateItem]
     public required string Path { get; init; }

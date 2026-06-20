@@ -63,7 +63,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
     }
 }
 
-public abstract class ActivityStatus : ILogPropertyFeed
+public abstract class ActivityStatus : ILogPropertySource
 {
     public abstract string Code { get; }
 
