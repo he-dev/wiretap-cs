@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
@@ -5,17 +6,31 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope(string activityName) : ILogPropertyFeed, IMessagePartFeed, IDisposable
+public abstract class ActivityScope : ILogPropertyFeed, IMessagePartFeed, IDisposable, IEnumerable<ActivityScope>
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
-    protected ActivityCast ActivityCast { get; } = ActivityCast.Start(activityName);
+    protected ActivityScope(Activity activity)
+    {
+        Activity = activity;
+        ActivityCast = ActivityCast.Start(activity.Name);
+    }
 
-    public int Depth => AmbientScope.Depth;
+    protected ActivityCast ActivityCast { get; }
 
-    public string Path => AmbientScope.PathOf(x => x.ActivityName);
+    public Activity Activity { get; }
 
-    public string ActivityName { get; } = activityName;
+    public ActivityScope? Parent { get; private set; }
+
+    public IEnumerable<ActivityScope> Ancestors => this.Skip(1);
+
+    public int Depth => Ancestors.Count();
+
+    public string Path => string.Join("/", this.Reverse().Select(x => x.Activity.Name));
+
+    public string ActivityName => Activity.Name;
+
+    public static ActivityScope? Current => AmbientContext<ActivityScope>.Current;
 
     protected abstract string Role { get; }
 
@@ -40,6 +55,7 @@ public abstract class ActivityScope(string activityName) : ILogPropertyFeed, IMe
 
     internal virtual void Push()
     {
+        Parent = Current;
         AmbientScope = AmbientContext<ActivityScope>.Push(this);
     }
 
@@ -49,13 +65,24 @@ public abstract class ActivityScope(string activityName) : ILogPropertyFeed, IMe
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
     }
+
+    // core: Scope traversal starts with the current scope and proceeds toward the root.
+    public IEnumerator<ActivityScope> GetEnumerator()
+    {
+        for (ActivityScope? current = this; current is not null; current = current.Parent)
+        {
+            yield return current;
+        }
+    }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity.Name) where TActivity : Activity
+public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity) where TActivity : Activity
 {
     private static ConcurrentDictionary<Type, byte> CustomStatusWarnings { get; } = new();
 
-    protected TActivity Activity => activity;
+    public new TActivity Activity => (TActivity)base.Activity;
 
     protected IComposeMessage ComposeMessage => Configuration.Current.ComposeMessage;
 

@@ -48,16 +48,3 @@ internal sealed class AmbientContext<T> : IDisposable, IEnumerable<AmbientContex
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
-
-internal static class ActivityScopeStackExtensions
-{
-    extension<T>(AmbientContext<T>? scope) where T : class
-    {
-        public int Depth => scope?.Skip(1).Count() ?? 0;
-
-        public string PathOf(Func<T, string> select)
-        {
-            return scope is null ? string.Empty : string.Join("/", scope.Reverse().Select(x => select(x.Value)));
-        }
-    }
-}

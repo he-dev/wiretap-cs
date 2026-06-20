@@ -15,12 +15,14 @@ public static class GetStateItems
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
-    public static Dictionary<string, object?> From(params object?[] sources)
+    public static Dictionary<string, object?> From(params object?[] sources) =>
+        From(Configuration.Current.PropertyName, sources);
+
+    public static Dictionary<string, object?> From(PropertyName root, params object?[] sources)
     {
         // note: Using a list rather than Enumerable.Concat for performance reasons.
 
         var stateItems = new Dictionary<string, object?>();
-        var root = Configuration.Current.PropertyName;
         var pushStateItem = new PushLogProperty((key, value) => stateItems[key] = value);
 
         foreach (var source in sources)

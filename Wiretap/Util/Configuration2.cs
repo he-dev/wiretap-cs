@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
@@ -32,10 +34,17 @@ public static class Configuration2
     };
     private static readonly ConcurrentDictionary<Type, Variant> Resolved = new();
 
+    internal static ILogger DiagnosticLogger { get; private set; } = NullLogger.Instance;
+
     public static Variant Default => Variants[DefaultKey];
 
     public static Variant? Get(string name) =>
         Variants.GetValueOrDefault(new Key.Named(name));
+
+    public static void LogDiagnosticsWith(ILogger logger) => DiagnosticLogger = logger;
+
+    public static void UseDiagnosticsLogger(ILoggerFactory loggerFactory, string category = "Wiretap.Diagnostics") =>
+        LogDiagnosticsWith(loggerFactory.CreateLogger(category));
 
     public static void SetDefault(Func<Variant> variant)
     {
@@ -67,7 +76,16 @@ public static class Configuration2
             return Default;
         }
 
-        // TODO: Warn through the future diagnostic logger before falling back to the default.
-        return Get(name) ?? Default;
+        return Get(name) ?? WarnAndUseDefault(name, activityType);
+    }
+
+    private static Variant WarnAndUseDefault(string name, Type activityType)
+    {
+        DiagnosticLogger.LogWarning(
+            "Configuration variant {Variant} requested by {ActivityType} was not found; using the default variant.",
+            name,
+            activityType.FullName
+        );
+        return Default;
     }
 }
