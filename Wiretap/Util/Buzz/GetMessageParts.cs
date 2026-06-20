@@ -39,7 +39,11 @@ public static class GetMessageParts
         {
             if (getter.GetValue(source) is { } value)
             {
-                push(getter.Template(root.Activity.State), value);
+                push(
+                    root.Activity.State.Append(getter.PropertyName),
+                    getter.Template(root.Activity.State),
+                    value
+                );
             }
         }
     }

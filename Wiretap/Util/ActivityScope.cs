@@ -22,6 +22,7 @@ public abstract class ActivityScope(string activityName) : ILogPropertyFeed, IMe
     public virtual void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
         push(
+            root.Activity.Name,
             $"{root.Activity.Name:_}[{root.Activity.Status.Code:_}]",
             get(root.Activity.Name),
             get(root.Activity.Status.Code)

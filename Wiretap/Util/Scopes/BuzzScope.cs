@@ -50,7 +50,11 @@ public class BuzzScope<TActivity>
     public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
         base.MessageParts(root, get, push);
-        push($"Duration: {root.Activity.DurationMs:N0} ms", get(root.Activity.DurationMs));
+        push(
+            root.Activity.DurationMs,
+            $"Duration: {root.Activity.DurationMs:N0} ms",
+            get(root.Activity.DurationMs)
+        );
     }
 
     private void LogStatus(ActivityStatus<TActivity> status, IMessagePartFeed? suffix = null, TimeSpan? duration = null)
@@ -114,6 +118,6 @@ public class LastStatusMessageFeed([StructuredMessageTemplate] string? message, 
 {
     public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        push(message, args);
+        push(root.Activity.Status.Append("suffix"), message, args);
     }
 }

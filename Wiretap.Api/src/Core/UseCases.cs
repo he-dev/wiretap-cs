@@ -38,7 +38,11 @@ public class DeleteFile : Activity.Buzz
 
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push($"Reason: {root.Activity.State.Append("Reason"):_}", Reason);
+            push(
+                root.Activity.State.Append("Reason"),
+                $"Reason: {root.Activity.State.Append("Reason"):_}",
+                Reason
+            );
         }
 
         public sealed class NotFound : DeleteFile.Noop

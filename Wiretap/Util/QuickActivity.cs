@@ -12,7 +12,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
     public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        push(message, args);
+        push(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -20,7 +20,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -29,7 +29,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -40,7 +40,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
         {
             // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
             base.MessageParts(root, get, push);
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 }
@@ -54,7 +54,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
     public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        push(message, args);
+        push(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -62,7 +62,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -71,7 +71,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -82,7 +82,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
         {
             // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
             base.MessageParts(root, get, push);
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 }
@@ -98,7 +98,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts use the same structured message pattern as LastStatusMessageFeed.
     public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
-        push(message, args);
+        push(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -106,7 +106,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -115,7 +115,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -126,7 +126,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
         {
             // core: Keep the exception message behavior from normal Fail statuses, then append quick status text.
             base.MessageParts(root, get, push);
-            push(message, args);
+            push(root.Activity.Status.Append("message"), message, args);
         }
     }
 }

@@ -41,7 +41,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
         {
             if (Exception is not null)
             {
-                push(Exception.Message);
+                push(root.Activity.Status.Append("exception"), Exception.Message);
             }
         }
     }
@@ -55,7 +55,10 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
         {
-            push("The activity scope exited without an explicit last status.");
+            push(
+                root.Activity.Status.Append("message"),
+                "The activity scope exited without an explicit last status."
+            );
         }
     }
 }

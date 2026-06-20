@@ -11,7 +11,7 @@ public class ComposeMessageByAppending(string separator = "; ") : IComposeMessag
         var temp = new StringBuilder(256);
         var args = new List<object?>(32);
 
-        var push = new PushMessagePart((t, a) =>
+        var push = new PushMessagePart((_, t, a) =>
         {
             if (!string.IsNullOrEmpty(t))
             {

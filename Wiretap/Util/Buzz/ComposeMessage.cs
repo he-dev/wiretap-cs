@@ -9,7 +9,11 @@ public interface IComposeMessage
 
 // core: Implements a message schema where parts are appended in feed order and joined by a separator.
 
-public delegate void PushMessagePart([StructuredMessageTemplate] string? message, params object?[] args);
+public delegate void PushMessagePart(
+    PropertyName name,
+    [StructuredMessageTemplate] string? message,
+    params object?[] args
+);
 
 public delegate object? GetStateItem(string name);
 

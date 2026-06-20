@@ -76,6 +76,7 @@ public sealed class BulkMath : ILogPropertyFeed, IMessagePartFeed
         {
             var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
             push(
+                root.Activity.State.Append(code),
                 $"{label}: {root.Activity.State.Append($"{code}_rate"):P1} ({root.Activity.State.Append($"{code}_count"):_} of {root.Activity.State.Append("item_count"):_})",
                 RateOf(code),
                 _statusCounts[code],
@@ -83,7 +84,11 @@ public sealed class BulkMath : ILogPropertyFeed, IMessagePartFeed
             );
         }
 
-        push($"Throughput: {root.Activity.State.Append("throughput_s"):N1}/s", ThroughputS);
+        push(
+            root.Activity.State.Append("throughput_s"),
+            $"Throughput: {root.Activity.State.Append("throughput_s"):N1}/s",
+            ThroughputS
+        );
     }
 
     private double RateOf(string code)

@@ -17,7 +17,7 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
     public override void MessageParts(PropertyName root, GetStateItem get, PushMessagePart push)
     {
         base.MessageParts(root, get, push);
-        push("Duration: N/A");
+        push(root.Activity.DurationMs, "Duration: N/A");
     }
 
     private void Log(ActivityStatus<TActivity> status)
