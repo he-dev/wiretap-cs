@@ -2,6 +2,21 @@ namespace Wiretap.Util;
 
 public readonly record struct PropertyName(string Separator = ".", params string[] Parts) : IFormattable
 {
+    public bool Equals(PropertyName other) =>
+        Separator == other.Separator && Parts.AsSpan().SequenceEqual(other.Parts);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Separator, StringComparer.Ordinal);
+        foreach (var part in Parts)
+        {
+            hash.Add(part, StringComparer.Ordinal);
+        }
+
+        return hash.ToHashCode();
+    }
+
     public PropertyName Append(params string[] parts)
     {
         return this with { Parts = [..Parts, ..parts] };

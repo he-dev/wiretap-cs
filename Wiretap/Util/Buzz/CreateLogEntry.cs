@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace Wiretap.Util.Buzz;
@@ -135,7 +136,9 @@ public sealed class CreateLogEntry
 
         public Builder()
         {
-            RegisterMessageParts(PushDefaultMessageParts);
+            RegisterMessageParts(PushActivityHeader);
+            RegisterMessageParts(PushActivityDuration);
+            RegisterMessageParts(PushBulkSummary);
         }
 
         public Builder ArrangeMessageParts(Func<MessageContext, IReadOnlyList<MessageTemplate>> arrange)
@@ -163,7 +166,7 @@ public sealed class CreateLogEntry
             [.._messagePartRegistrations]
         );
 
-        private static void PushDefaultMessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+        private static void PushActivityHeader(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
             push(
                 root.Activity.Name,
@@ -171,10 +174,43 @@ public sealed class CreateLogEntry
                 get(root.Activity.Name),
                 get(root.Activity.Status.Code)
             );
+        }
+
+        private static void PushActivityDuration(PropertyName root, GetLogProperty get, PushMessagePart push)
+        {
+            if (get(root.Activity.Role) is "snap")
+            {
+                push(root.Activity.DurationMs, "Duration: N/A");
+                return;
+            }
+
             push(
                 root.Activity.DurationMs,
                 $"Duration: {root.Activity.DurationMs:N0} ms",
                 get(root.Activity.DurationMs)
+            );
+        }
+
+        private static void PushBulkSummary(PropertyName root, GetLogProperty get, PushMessagePart push)
+        {
+            var state = root.Activity.State;
+
+            foreach (var code in new[] { "okay", "noop", "fail", "void" })
+            {
+                var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
+                push(
+                    state.Append(code),
+                    $"{label}: {state.Append($"{code}_rate"):P1} ({state.Append($"{code}_count"):_} of {state.Append("item_count"):_})",
+                    get(state.Append($"{code}_rate")),
+                    get(state.Append($"{code}_count")),
+                    get(state.Append("item_count"))
+                );
+            }
+
+            push(
+                state.Append("throughput_s"),
+                $"Throughput: {state.Append("throughput_s"):N1}/s",
+                get(state.Append("throughput_s"))
             );
         }
 

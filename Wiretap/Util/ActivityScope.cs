@@ -6,7 +6,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope(Activity activity) : ILogPropertySource, IMessagePartFeed, IDisposable, IEnumerable<ActivityScope>
+public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDisposable, IEnumerable<ActivityScope>
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
@@ -29,16 +29,6 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IMe
     public static ActivityScope? Current => AmbientContext<ActivityScope>.Current;
 
     protected abstract string Role { get; }
-
-    public virtual void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
-    {
-        push(
-            root.Activity.Name,
-            $"{root.Activity.Name:_}[{root.Activity.Status.Code:_}]",
-            get(root.Activity.Name),
-            get(root.Activity.Status.Code)
-        );
-    }
 
     public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {

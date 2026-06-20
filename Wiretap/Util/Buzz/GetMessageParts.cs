@@ -54,7 +54,8 @@ public static class GetMessageParts
 
     private static Getter[] DiscoverMessageParts(Type type)
     {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        // todo: Warn through the diagnostic logger when annotated non-public properties are ignored.
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
 
         var messagePartGetters =
             from property in type.GetProperties(flags)

@@ -13,7 +13,15 @@ public sealed class MessagePartMap : IEnumerable<KeyValuePair<PropertyName, Mess
     ) =>
         Push(name, new MessageTemplate(message, args));
 
-    public void Push(PropertyName name, MessageTemplate message) => _entries[name] = message;
+    public void Push(PropertyName name, MessageTemplate message)
+    {
+        if (message.Template is null || message.Args.Any(value => value is null))
+        {
+            return;
+        }
+
+        _entries[name] = message;
+    }
 
     public MessageTemplate? Pop(PropertyName name)
     {

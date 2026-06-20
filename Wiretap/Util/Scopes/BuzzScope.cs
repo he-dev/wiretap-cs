@@ -30,7 +30,7 @@ public class BuzzScope<TActivity>
         if (_lastStatus is { } lastStatus)
         {
             var name = Variant.CreateLogEntryBy.Root;
-            var state = GetLogPropertys.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
+            var state = GetLogProperties.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
 
             using (logger.BeginScope(state))
             {
@@ -44,16 +44,6 @@ public class BuzzScope<TActivity>
         }
 
         _lastStatus = new(status, duration);
-    }
-
-    public override void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
-    {
-        base.MessageParts(root, get, push);
-        push(
-            root.Activity.DurationMs,
-            $"Duration: {root.Activity.DurationMs:N0} ms",
-            get(root.Activity.DurationMs)
-        );
     }
 
     public override void LogProperties(PropertyName name, PushLogProperty push)

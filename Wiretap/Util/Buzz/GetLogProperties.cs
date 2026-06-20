@@ -11,7 +11,7 @@ public interface ILogPropertySource
     void LogProperties(PropertyName name, PushLogProperty push);
 }
 
-public static class GetLogPropertys
+public static class GetLogProperties
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
@@ -57,7 +57,8 @@ public static class GetLogPropertys
 
     private static Getter[] DiscoverStateItems(Type type)
     {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        // todo: Warn through the diagnostic logger when annotated non-public properties are ignored.
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
 
         var stateItemGetters =
             from property in type.GetProperties(flags)

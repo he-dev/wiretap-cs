@@ -3,7 +3,7 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;
 
-public sealed class BulkMath : ILogPropertySource, IMessagePartFeed
+public sealed class BulkMath : ILogPropertySource
 {
     private readonly Dictionary<string, int> _statusCounts = new(StringComparer.Ordinal);
     private double _durationMean;
@@ -63,32 +63,6 @@ public sealed class BulkMath : ILogPropertySource, IMessagePartFeed
         push(name.Activity.State.Append("duration_ms_max"), DurationMsMax);
         push(name.Activity.State.Append("duration_ms_std_dev"), DurationMsStdDev);
         push(name.Activity.State.Append("throughput_s"), ThroughputS);
-    }
-
-    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
-    {
-        if (ItemCount == 0)
-        {
-            return;
-        }
-
-        foreach (var code in _statusCounts.Keys)
-        {
-            var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
-            push(
-                root.Activity.State.Append(code),
-                $"{label}: {root.Activity.State.Append($"{code}_rate"):P1} ({root.Activity.State.Append($"{code}_count"):_} of {root.Activity.State.Append("item_count"):_})",
-                RateOf(code),
-                _statusCounts[code],
-                ItemCount
-            );
-        }
-
-        push(
-            root.Activity.State.Append("throughput_s"),
-            $"Throughput: {root.Activity.State.Append("throughput_s"):N1}/s",
-            ThroughputS
-        );
     }
 
     private double RateOf(string code)
