@@ -1,6 +1,5 @@
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;

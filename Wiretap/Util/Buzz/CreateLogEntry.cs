@@ -2,6 +2,29 @@ using System.Text;
 
 namespace Wiretap.Util.Buzz;
 
+public interface IArrangeMessageParts
+{
+    IReadOnlyList<MessagePartMap.Entry> By(MessageContext context);
+}
+
+public class ArrangeMessageParts : IArrangeMessageParts
+{
+    public IReadOnlyList<MessagePartMap.Entry> By(MessageContext context)
+    {
+        return
+        [
+            ..new[]
+            {
+                context.Parts.Pop(context.Root.Activity.Name),
+                context.Parts.Pop(context.Root.Activity.DurationMs),
+            }.OfType<MessagePartMap.Entry>(),
+            ..context.Parts
+                .OrderBy(x => x.Key.ToString(), StringComparer.Ordinal)
+                .Select(x => x.Value),
+        ];
+    }
+}
+
 public sealed class CreateLogEntry
 {
     private readonly PropertyName _root;
@@ -61,7 +84,8 @@ public sealed class CreateLogEntry
         return properties;
     }
 
-    private MessagePartMap CollectMessageParts(
+    private MessagePartMap CollectMessageParts
+    (
         IReadOnlyDictionary<string, object?> properties,
         ActivityScope scope,
         ActivityStatus status

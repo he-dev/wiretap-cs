@@ -30,7 +30,7 @@ public static class Configuration
 
     internal static ILogger DiagnosticLogger { get; private set; } = NullLogger.Instance;
 
-    public static ITraceContext TraceContext { get; set; } = new TraceContext();
+    public static ITraceContext TraceContext { get; private set; } = new TraceContext();
 
     public static Variant Default => Variants[DefaultKey];
 
@@ -40,6 +40,8 @@ public static class Configuration
 
     public static void UseDiagnosticsLogger(ILoggerFactory loggerFactory, string category = "Wiretap.Diagnostics") =>
         LogDiagnosticsWith(loggerFactory.CreateLogger(category));
+
+    public static void UseTraceContext(ITraceContext traceContext) => TraceContext = traceContext;
 
     public static void SetDefault(Func<Variant> variant)
     {
