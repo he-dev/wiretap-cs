@@ -22,7 +22,10 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
 
     private void Log(ActivityStatus<TActivity> status)
     {
-        WarnIfCustomStatusName(status);
+        Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+            $"{ActivityName}.{status.GetType().Name}",
+            $"{ActivityName}.{status.Code}"
+        );
         logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
 
         TraceHandle.Stop(ok: status switch

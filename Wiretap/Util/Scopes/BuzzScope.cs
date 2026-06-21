@@ -54,7 +54,10 @@ public class BuzzScope<TActivity>
 
     private void LogStatus(ActivityStatus<TActivity> status, TimeSpan? duration = null)
     {
-        WarnIfCustomStatusName(status);
+        Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+            $"{ActivityName}.{status.GetType().Name}",
+            $"{ActivityName}.{status.Code}"
+        );
         _logDuration = duration ?? Stopwatch.Elapsed;
         try
         {

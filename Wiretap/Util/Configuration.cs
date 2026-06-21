@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
@@ -28,7 +27,7 @@ public static class Configuration
     private static readonly ConcurrentDictionary<Key, Variant> Variants = new() { [DefaultKey] = new Variant() };
     private static readonly ConcurrentDictionary<Type, Variant> Resolved = new();
 
-    internal static ILogger DiagnosticLogger { get; private set; } = NullLogger.Instance;
+    internal static DiagnosticLogger DiagnosticLogger { get; private set; } = DiagnosticLogger.None;
 
     public static ITraceContext TraceContext { get; private set; } = new TraceContext();
 
@@ -36,7 +35,7 @@ public static class Configuration
 
     public static Variant? Get(string name) => Variants.GetValueOrDefault(new Key.Named(name));
 
-    public static void LogDiagnosticsWith(ILogger logger) => DiagnosticLogger = logger;
+    public static void LogDiagnosticsWith(ILogger logger) => DiagnosticLogger = new DiagnosticLogger(logger);
 
     public static void UseDiagnosticsLogger(ILoggerFactory loggerFactory, string category = "Wiretap.Diagnostics") =>
         LogDiagnosticsWith(loggerFactory.CreateLogger(category));
@@ -71,15 +70,14 @@ public static class Configuration
             return Default;
         }
 
-        return Get(name) ?? WarnAndUseDefault(name, activityType);
-    }
+        if (Get(name) is { } variant)
+        {
+            return variant;
+        }
 
-    private static Variant WarnAndUseDefault(string name, Type activityType)
-    {
-        DiagnosticLogger.LogWarning(
-            "Configuration variant {Variant} requested by {ActivityType} was not found; using the default variant.",
+        DiagnosticLogger.WarnAboutMissingConfigurationVariant(
             name,
-            activityType.FullName
+            activityType.FullName ?? activityType.Name
         );
         return Default;
     }

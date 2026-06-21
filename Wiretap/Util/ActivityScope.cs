@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz;
@@ -71,32 +70,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
 
 public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity) where TActivity : Activity
 {
-    private static ConcurrentDictionary<Type, byte> CustomStatusWarnings { get; } = new();
-
     public new TActivity Activity => (TActivity)base.Activity;
-
-    protected void WarnIfCustomStatusName(ActivityStatus<TActivity> status)
-    {
-        if (status.GetType().Name == status.Code)
-        {
-            return;
-        }
-
-        if (!CustomStatusWarnings.TryAdd(status.GetType(), 0))
-        {
-            return;
-        }
-
-        var statusName = $"{ActivityName}.{status.GetType().Name}";
-        var canonicalName = $"{ActivityName}.{status.Code}";
-        Configuration.DiagnosticLogger.LogWarning(
-            "{StatusName} will be logged as {CanonicalName} because only canonical status names are allowed. Rename {StatusNameToRename} to {CanonicalNameToUse} to get rid of this warning.",
-            statusName,
-            canonicalName,
-            statusName,
-            canonicalName
-        );
-    }
 
     public override void LogProperties(PropertyName name, PushLogProperty push)
     {
