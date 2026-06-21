@@ -55,7 +55,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
     // core: Scope traversal starts with the current scope and proceeds toward the root.
     public IEnumerator<ActivityScope> GetEnumerator()
     {
-        for (ActivityScope? current = this; current is not null; current = current.Parent)
+        for (var current = this; current is not null; current = current.Parent)
         {
             yield return current;
         }

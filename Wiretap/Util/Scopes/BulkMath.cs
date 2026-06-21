@@ -49,20 +49,22 @@ public sealed class BulkMath : ILogPropertySource
             return;
         }
 
-        push(name.Activity.State.Append("item_count"), ItemCount);
+        var bulk = name.Activity.State.Append("bulk");
+
+        push(bulk.Append("item_count"), ItemCount);
 
         foreach (var (code, count) in _statusCounts)
         {
-            push(name.Activity.State.Append($"{code}_count"), count);
-            push(name.Activity.State.Append($"{code}_rate"), RateOf(code));
+            push(bulk.Append($"{code}_count"), count);
+            push(bulk.Append($"{code}_rate"), RateOf(code));
         }
 
-        push(name.Activity.State.Append("duration_ms"), DurationMs);
-        push(name.Activity.State.Append("duration_ms_mean"), DurationMsMean);
-        push(name.Activity.State.Append("duration_ms_min"), DurationMsMin);
-        push(name.Activity.State.Append("duration_ms_max"), DurationMsMax);
-        push(name.Activity.State.Append("duration_ms_std_dev"), DurationMsStdDev);
-        push(name.Activity.State.Append("throughput_s"), ThroughputS);
+        push(bulk.Append("duration_ms"), DurationMs);
+        push(bulk.Append("duration_ms_mean"), DurationMsMean);
+        push(bulk.Append("duration_ms_min"), DurationMsMin);
+        push(bulk.Append("duration_ms_max"), DurationMsMax);
+        push(bulk.Append("duration_ms_std_dev"), DurationMsStdDev);
+        push(bulk.Append("throughput_s"), ThroughputS);
     }
 
     private double RateOf(string code)

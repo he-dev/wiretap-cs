@@ -5,56 +5,75 @@ namespace Wiretap.Util.Buzz;
 
 public interface IArrangeMessageParts
 {
-    IReadOnlyList<MessageTemplate> By(MessageContext context);
+    IReadOnlyList<MessageTemplate> By(PropertyName root, MessagePartMap parts);
 }
 
 public class ArrangeMessageParts : IArrangeMessageParts
 {
-    public IReadOnlyList<MessageTemplate> By(MessageContext context)
+    public IReadOnlyList<MessageTemplate> By(PropertyName root, MessagePartMap parts)
     {
         return
         [
             ..new[]
             {
-                context.Parts.Pop(context.Root.Activity.Name),
-                context.Parts.Pop(context.Root.Activity.DurationMs),
+                parts.Pop(root.Activity.Name),
+                parts.Pop(root.Activity.DurationMs),
             }.OfType<MessageTemplate>(),
-            ..context.Parts.Select(x => x.Value),
+            ..parts.Select(x => x.Value),
         ];
     }
 }
 
-public sealed class CreateLogEntry
+public interface IJoinMessageParts
 {
-    private readonly PropertyName _root;
-    private readonly Func<MessageContext, IReadOnlyList<MessageTemplate>> _arrangeMessageParts;
+    MessageTemplate By(IReadOnlyList<MessageTemplate> entries);
+}
 
-    private readonly Func<IReadOnlyList<MessageTemplate>, MessageTemplate> _joinMessageParts;
-
-    private readonly IReadOnlyList<Action<PropertyName, GetLogProperty, PushMessagePart>> _messagePartRegistrations;
-
-    public PropertyName Root => _root;
-
-    private CreateLogEntry
-    (
-        PropertyName root,
-        Func<MessageContext, IReadOnlyList<MessageTemplate>> arrangeMessageParts,
-        Func<IReadOnlyList<MessageTemplate>, MessageTemplate> joinMessageParts,
-        IReadOnlyList<Action<PropertyName, GetLogProperty, PushMessagePart>> messagePartRegistrations
-    )
+public class JoinMessagePartsByAppending : IJoinMessageParts
+{
+    public MessageTemplate By(IReadOnlyList<MessageTemplate> entries)
     {
-        _root = root;
-        _arrangeMessageParts = arrangeMessageParts;
-        _joinMessageParts = joinMessageParts;
-        _messagePartRegistrations = messagePartRegistrations;
+        var template = new StringBuilder(256);
+        var args = new List<object?>(32);
+        foreach (var message in entries)
+        {
+            if (string.IsNullOrEmpty(message.Template))
+            {
+                continue;
+            }
+
+            template.Append(template.Length == 0 ? string.Empty : "; ");
+            template.Append(message.Template);
+            args.AddRange(message.Args);
+        }
+
+        return new MessageTemplate(template.ToString(), [.. args]);
     }
+}
+
+public delegate void MessagePartRegistration(PropertyName root, GetLogProperty get, PushMessagePart push);
+
+interface IGetLogProperties
+{
+    IDictionary<string, object?> From(ActivityScope scope, ActivityStatus status);
+}
+
+
+public sealed class CreateLogEntry
+(
+    PropertyName root,
+    IArrangeMessageParts arrangeMessageParts,
+    IJoinMessageParts joinMessageParts,
+    IReadOnlyList<MessagePartRegistration> messagePartRegistrations
+)
+{
+    public PropertyName Root => root;
 
     public LogEntry From(ActivityScope scope, ActivityStatus status)
     {
         var properties = CollectLogProperties(scope, status);
         var messageParts = CollectMessageParts(properties, scope.Activity, status);
-        var context = new MessageContext(_root, properties, messageParts);
-        var message = _joinMessageParts(_arrangeMessageParts(context));
+        var message = joinMessageParts.By(arrangeMessageParts.By(Root, messageParts));
         return new LogEntry(status.Level, message, properties, status.Exception);
     }
 
@@ -70,7 +89,7 @@ public sealed class CreateLogEntry
         });
 
         AnnotatedStateItems.PushFromAncestors(
-            _root.Activity.State,
+            Root.Activity.State,
             push,
             scope.Reverse().SkipLast(1).Select(x => x.Activity)
         );
@@ -79,12 +98,12 @@ public sealed class CreateLogEntry
         {
             if (source is ILogPropertySource feed)
             {
-                feed.LogProperties(_root, push);
+                feed.LogProperties(Root, push);
             }
         }
 
-        AnnotatedStateItems.PushFromSelf(_root.Activity.State, push, scope.Activity);
-        AnnotatedStateItems.PushFromSelf(_root.Activity.State, push, status);
+        AnnotatedStateItems.PushFromSelf(Root.Activity.State, push, scope.Activity);
+        AnnotatedStateItems.PushFromSelf(Root.Activity.State, push, status);
         return properties;
     }
 
@@ -99,11 +118,11 @@ public sealed class CreateLogEntry
         var get = new GetLogProperty(properties.GetValueOrDefault);
         var push = new PushMessagePart(parts.Push);
 
-        GetMessageParts.From(_root, properties, push, activity, status);
+        GetMessageParts.From(Root, properties, push, activity, status);
 
-        foreach (var registration in _messagePartRegistrations)
+        foreach (var registration in messagePartRegistrations)
         {
-            registration(_root, get, push);
+            registration(Root, get, push);
         }
 
         return parts;
@@ -118,19 +137,10 @@ public sealed class CreateLogEntry
 
     public sealed class Builder
     {
-        private readonly List<Action<PropertyName, GetLogProperty, PushMessagePart>> _messagePartRegistrations = [];
+        private IArrangeMessageParts ArrangeMessageParts { get; set; }= new ArrangeMessageParts();
+        private IJoinMessageParts JoinMessageParts { get; set; }= new JoinMessagePartsByAppending();
 
-        private Func<MessageContext, IReadOnlyList<MessageTemplate>> _arrangeMessageParts = context =>
-        [
-            ..new[]
-            {
-                context.Parts.Pop(context.Root.Activity.Name),
-                context.Parts.Pop(context.Root.Activity.DurationMs),
-            }.OfType<MessageTemplate>(),
-            ..context.Parts.Select(x => x.Value),
-        ];
-
-        private Func<IReadOnlyList<MessageTemplate>, MessageTemplate> _joinMessageParts = JoinByAppending;
+        private readonly List<MessagePartRegistration> _messagePartRegistrations = [];
 
         public PropertyName Root { get; set; } = new(Parts: ["wiretap"]);
 
@@ -141,19 +151,8 @@ public sealed class CreateLogEntry
             RegisterMessageParts(PushBulkSummary);
         }
 
-        public Builder ArrangeMessageParts(Func<MessageContext, IReadOnlyList<MessageTemplate>> arrange)
-        {
-            _arrangeMessageParts = arrange;
-            return this;
-        }
 
-        public Builder JoinMessageParts(Func<IReadOnlyList<MessageTemplate>, MessageTemplate> join)
-        {
-            _joinMessageParts = join;
-            return this;
-        }
-
-        public Builder RegisterMessageParts(Action<PropertyName, GetLogProperty, PushMessagePart> registration)
+        public Builder RegisterMessageParts(MessagePartRegistration registration)
         {
             _messagePartRegistrations.Add(registration);
             return this;
@@ -161,8 +160,8 @@ public sealed class CreateLogEntry
 
         internal CreateLogEntry Build() => new(
             Root,
-            _arrangeMessageParts,
-            _joinMessageParts,
+            ArrangeMessageParts,
+            JoinMessageParts,
             [.._messagePartRegistrations]
         );
 
@@ -193,7 +192,7 @@ public sealed class CreateLogEntry
 
         private static void PushBulkSummary(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            var state = root.Activity.State;
+            var state = root.Activity.State.Append("bulk");
 
             foreach (var code in new[] { "okay", "noop", "fail", "void" })
             {
@@ -238,14 +237,5 @@ public sealed class CreateLogEntry
 public sealed record MessageContext
 (
     PropertyName Root,
-    IReadOnlyDictionary<string, object?> Properties,
     MessagePartMap Parts
 );
-
-public class Demo
-{
-    public void SomeMessages(PropertyName root, GetLogProperty get, PushMessagePart push)
-    {
-        push(root.Activity.DurationMs, $"Duration: {root.Activity.DurationMs:N0} ms", get(root.Activity.DurationMs));
-    }
-}
