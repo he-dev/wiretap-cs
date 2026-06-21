@@ -32,6 +32,11 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
 
     public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {
+        foreach (var ancestor in Ancestors.Reverse())
+        {
+            GetLogProperties.ByAttribute(name.Activity.State, ancestor.Activity, push, cascadingOnly: true);
+        }
+
         TraceHandle.LogProperties(name, push);
         push(name.Activity.Name, ActivityName);
         push(name.Activity.Role, Role);

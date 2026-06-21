@@ -17,21 +17,19 @@ public static class GetLogProperties
 
     public static Dictionary<string, object?> From(PropertyName root, params object?[] sources)
     {
-        // note: Using a list rather than Enumerable.Concat for performance reasons.
-
-        var stateItems = new Dictionary<string, object?>();
-        var pushStateItem = new PushLogProperty((key, value) => stateItems[key] = value);
+        var properties = new Dictionary<string, object?>();
+        var push = PushTo(properties);
 
         foreach (var source in sources)
         {
             if (source is not null)
             {
-                ByInterface(root, source, pushStateItem);
-                ByAttribute(root, source, pushStateItem);
+                ByInterface(root, source, push);
+                ByAttribute(root.Activity.State, source, push);
             }
         }
 
-        return stateItems;
+        return properties;
     }
 
     private static void ByInterface(PropertyName root, object source, PushLogProperty push)
@@ -42,15 +40,32 @@ public static class GetLogProperties
         }
     }
 
-    private static void ByAttribute<T>(PropertyName root, T source, PushLogProperty push) where T : notnull
+    private static PushLogProperty PushTo(Dictionary<string, object?> properties)
+    {
+        return (name, value) =>
+        {
+            if (value is not null)
+            {
+                properties[name] = value;
+            }
+        };
+    }
+
+    internal static void ByAttribute
+    (
+        PropertyName root,
+        object source,
+        PushLogProperty push,
+        bool cascadingOnly = false
+    )
     {
         var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
 
         foreach (var getter in getters)
         {
-            if (getter.GetValue(source) is { } value)
+            if ((!cascadingOnly || getter.Cascade) && getter.GetValue(source) is { } value)
             {
-                push(root.Activity.State.Append(getter.Key), value);
+                push(root.Append(getter.Name), value);
             }
         }
     }
@@ -64,12 +79,12 @@ public static class GetLogProperties
             from property in type.GetProperties(flags)
             let attr = property.GetCustomAttribute<StateItem>()
             where attr is not null
-            select new Getter(attr.Name ?? property.Name, Getter.Compile(type, property));
+            select new Getter(attr.Name ?? property.Name, attr.Cascade, Getter.Compile(type, property));
 
         return [..stateItemGetters];
     }
 
-    private sealed record Getter(string Key, Func<object, object?> GetValue)
+    private sealed record Getter(string Name, bool Cascade, Func<object, object?> GetValue)
     {
         public static Func<object, object?> Compile(Type type, PropertyInfo property)
         {

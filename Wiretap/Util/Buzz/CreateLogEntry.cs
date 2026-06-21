@@ -53,12 +53,6 @@ public class JoinMessagePartsByAppending : IJoinMessageParts
 
 public delegate void MessagePartRegistration(PropertyName root, GetLogProperty get, PushMessagePart push);
 
-interface IGetLogProperties
-{
-    IDictionary<string, object?> From(ActivityScope scope, ActivityStatus status);
-}
-
-
 public sealed class CreateLogEntry
 (
     PropertyName root,
@@ -71,40 +65,10 @@ public sealed class CreateLogEntry
 
     public LogEntry From(ActivityScope scope, ActivityStatus status)
     {
-        var properties = CollectLogProperties(scope, status);
+        var properties = GetLogProperties.From(Root, scope, scope.Activity, status);
         var messageParts = CollectMessageParts(properties, scope.Activity, status);
         var message = joinMessageParts.By(arrangeMessageParts.By(Root, messageParts));
         return new LogEntry(status.Level, message, properties, status.Exception);
-    }
-
-    private Dictionary<string, object?> CollectLogProperties(ActivityScope scope, ActivityStatus status)
-    {
-        var properties = new Dictionary<string, object?>();
-        var push = new PushLogProperty((name, value) =>
-        {
-            if (value is not null)
-            {
-                properties[name] = value;
-            }
-        });
-
-        AnnotatedStateItems.PushFromAncestors(
-            Root.Activity.State,
-            push,
-            scope.Reverse().SkipLast(1).Select(x => x.Activity)
-        );
-
-        foreach (var source in new object[] { scope, scope.Activity, status })
-        {
-            if (source is ILogPropertySource feed)
-            {
-                feed.LogProperties(Root, push);
-            }
-        }
-
-        AnnotatedStateItems.PushFromSelf(Root.Activity.State, push, scope.Activity);
-        AnnotatedStateItems.PushFromSelf(Root.Activity.State, push, status);
-        return properties;
     }
 
     private MessagePartMap CollectMessageParts
@@ -212,30 +176,6 @@ public sealed class CreateLogEntry
                 get(state.Append("throughput_s"))
             );
         }
-
-        private static MessageTemplate JoinByAppending(IReadOnlyList<MessageTemplate> entries)
-        {
-            var template = new StringBuilder(256);
-            var args = new List<object?>(32);
-            foreach (var message in entries)
-            {
-                if (string.IsNullOrEmpty(message.Template))
-                {
-                    continue;
-                }
-
-                template.Append(template.Length == 0 ? string.Empty : "; ");
-                template.Append(message.Template);
-                args.AddRange(message.Args);
-            }
-
-            return new MessageTemplate(template.ToString(), [.. args]);
-        }
     }
 }
 
-public sealed record MessageContext
-(
-    PropertyName Root,
-    MessagePartMap Parts
-);
