@@ -16,7 +16,7 @@ public static class LoggerExtensions
 
         public BulkScope<TBulk, TItem> BeginBulk<TBulk, TItem>(Activity.Bulk<TBulk, TItem> activity)
             where TBulk : Activity.Bulk<TBulk, TItem>
-            where TItem : Activity.Buzz
+            where TItem : Activity.Item
         {
             return new BulkScope<TBulk, TItem>(logger, (TBulk)activity).Also(x => x.Push());
         }

@@ -23,7 +23,7 @@ public sealed class ConfigurationTests
     public void ScopeLogsWithResolvedEntryFactory()
     {
         var logger = new CaptureLogger();
-        var factory = CreateLogEntry.By(builder => builder.JoinMessageParts(_ => new MessageTemplate("configured")));
+        var factory = CreateLogEntry.Default with { JoinMessageParts = new ConfiguredMessageParts() };
         Configuration.SetDefault(() => new Configuration.Variant(factory));
 
         try
@@ -42,6 +42,11 @@ public sealed class ConfigurationTests
     private sealed class MissingVariantActivity : Activity.Snap;
 
     private sealed class ConfiguredActivity : Activity.Buzz;
+
+    private sealed class ConfiguredMessageParts : IJoinMessageParts
+    {
+        public MessageTemplate By(IReadOnlyList<MessageTemplate> entries) => new("configured");
+    }
 
     private sealed class CaptureLogger : ILogger<ConfiguredActivity>
     {

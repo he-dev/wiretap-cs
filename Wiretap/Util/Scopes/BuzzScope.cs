@@ -1,81 +1,51 @@
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util.Scopes;
 
-public delegate void CountStatus<TActivity>(ActivityStatus<TActivity> status, TimeSpan duration) where TActivity : Activity.Buzz;
+public delegate void OnLastStatus<TActivity>(ActivityStatus<TActivity> status, TimeSpan duration)
+    where TActivity : Activity.Buzz;
 
 public class BuzzScope<TActivity>
 (
     ILogger logger,
     TActivity activity,
     StatusLogPolicy statusLogPolicy = StatusLogPolicy.Both,
-    CountStatus<TActivity>? onLastStatus = null
+    OnLastStatus<TActivity>? onLastStatus = null
 ) : ActivityScope<TActivity>(activity) where TActivity : Activity.Buzz
 {
-    private System.Diagnostics.Stopwatch Stopwatch { get; } = System.Diagnostics.Stopwatch.StartNew();
-    private Snapshot? _lastStatus;
-    private TimeSpan? _logDuration;
     private bool _disposed;
 
     protected ILogger Logger => logger;
 
-    protected override string Role => "buzz";
-
     public void SetStatus(ActivityStatus<TActivity> status)
-    {
-        // note: Makes sure everyone uses the same value.
-        var duration = Stopwatch.Elapsed;
-
-        if (_lastStatus is { } lastStatus)
-        {
-            var name = Variant.CreateLogEntryBy.Root;
-            var state = GetLogProperties.From(name, this, ActivityDurationSource.Freeze(duration), Activity, status);
-
-            using (logger.BeginScope(state))
-            {
-                logger.LogWarning(
-                    $"{name.Activity.Name:_} status changed from [{name.Activity.State.Append("status", "code", "old"):_}] to [{name.Activity.State.Append("status", "code", "new"):_}] before scope exit.",
-                    Activity.Name,
-                    lastStatus.Status.Code,
-                    status.Code
-                );
-            }
-        }
-
-        _lastStatus = new(status, duration);
-    }
-
-    public override void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        base.LogProperties(name, push);
-        push(name.Activity.DurationMs, (long)(_logDuration ?? Stopwatch.Elapsed).TotalMilliseconds);
-    }
-
-    private void LogStatus(ActivityStatus<TActivity> status, TimeSpan? duration = null)
     {
         Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
             $"{ActivityName}.{status.GetType().Name}",
             $"{ActivityName}.{status.Code}"
         );
-        _logDuration = duration ?? Stopwatch.Elapsed;
-        try
+
+        if (!Activity.SetStatus(status))
         {
-            logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
-        }
-        finally
-        {
-            _logDuration = null;
+            Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
+                Activity.Name,
+                Activity.Status.Code,
+                status.Code
+            );
         }
     }
 
+    private void LogStatus() =>
+        logger.LogEntry(Variant.CreateLogEntryBy.From(this));
+
     internal override void Push()
     {
+        Activity.Start();
         base.Push();
+        Activity.SetStatus(new ActivityStatus<TActivity>.Ready());
 
         if (statusLogPolicy.HasFlag(StatusLogPolicy.First))
         {
-            LogStatus(new ActivityStatus<TActivity>.Ready());
+            LogStatus();
         }
     }
 
@@ -88,8 +58,12 @@ public class BuzzScope<TActivity>
 
         try
         {
-            _lastStatus ??= new(new ActivityStatus<TActivity>.Void(), Stopwatch.Elapsed);
-            TraceHandle.Stop(ok: _lastStatus.Status switch
+            if (Activity.Status is not ActivityStatusRole.ILast)
+            {
+                Activity.SetStatus(new ActivityStatus<TActivity>.Void());
+            }
+
+            TraceHandle.Stop(ok: Activity.Status switch
             {
                 ActivityStatus<TActivity>.Okay => true,
                 ActivityStatus<TActivity>.Fail => false,
@@ -98,10 +72,10 @@ public class BuzzScope<TActivity>
 
             if (statusLogPolicy.HasFlag(StatusLogPolicy.Last))
             {
-                LogStatus(_lastStatus.Status, _lastStatus.Duration);
+                LogStatus();
             }
 
-            onLastStatus?.Invoke(_lastStatus.Status, _lastStatus.Duration);
+            onLastStatus?.Invoke((ActivityStatus<TActivity>)Activity.Status, Activity.Duration);
         }
         finally
         {
@@ -109,6 +83,4 @@ public class BuzzScope<TActivity>
             _disposed = true;
         }
     }
-
-    private record Snapshot(ActivityStatus<TActivity> Status, TimeSpan Duration);
 }

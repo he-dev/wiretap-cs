@@ -38,4 +38,24 @@ public static class DiagnosticWarnings
             activityType
         ));
     }
+
+    public static void WarnAboutLastStatusOverwrite
+    (
+        this DiagnosticLogger logger,
+        string activityName,
+        string currentStatus,
+        string ignoredStatus
+    )
+    {
+        logger.WarnOnce(
+            nameof(WarnAboutLastStatusOverwrite),
+            (activityName, currentStatus, ignoredStatus),
+            log => log.LogWarning(
+                "{ActivityName} status was already set to [{CurrentStatus}]; ignored later status [{IgnoredStatus}].",
+                activityName,
+                currentStatus,
+                ignoredStatus
+            )
+        );
+    }
 }

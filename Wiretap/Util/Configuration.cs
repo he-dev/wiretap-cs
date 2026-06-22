@@ -8,7 +8,7 @@ public static class Configuration
 {
     public sealed record Variant(CreateLogEntry CreateLogEntryBy)
     {
-        public Variant() : this(CreateLogEntry.By()) { }
+        public Variant() : this(CreateLogEntry.Default) { }
     }
 
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
@@ -27,7 +27,7 @@ public static class Configuration
     private static readonly ConcurrentDictionary<Key, Variant> Variants = new() { [DefaultKey] = new Variant() };
     private static readonly ConcurrentDictionary<Type, Variant> Resolved = new();
 
-    internal static DiagnosticLogger DiagnosticLogger { get; private set; } = DiagnosticLogger.None;
+    internal static DiagnosticLogger DiagnosticLogger { get; private set; } = DiagnosticLogger.Noop;
 
     public static ITraceContext TraceContext { get; private set; } = new TraceContext();
 

@@ -1,7 +1,7 @@
 using System.Globalization;
 using Wiretap.Util.Buzz;
 
-namespace Wiretap.Util.Scopes;
+namespace Wiretap.Util;
 
 public sealed class BulkMath : ILogPropertySource
 {
@@ -67,8 +67,6 @@ public sealed class BulkMath : ILogPropertySource
         push(bulk.Append("throughput_s"), ThroughputS);
     }
 
-    private double RateOf(string code)
-    {
-        return ItemCount > 0 ? _statusCounts[code] / (double)ItemCount : 0;
-    }
+    private double RateOf(string code) =>
+        ItemCount > 0 ? _statusCounts[code] / (double)ItemCount : 0;
 }

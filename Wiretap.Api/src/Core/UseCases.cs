@@ -25,7 +25,7 @@ public abstract class Workflow
     }
 }
 
-public class DeleteFile : Activity.Buzz
+public class DeleteFile : Activity.Item
 {
     public override string[] Tags { get; init; } = ["io"];
 

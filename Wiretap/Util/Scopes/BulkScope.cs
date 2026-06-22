@@ -6,17 +6,14 @@ namespace Wiretap.Util.Scopes;
 
 public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : BuzzScope<TBulk>(logger, activity)
     where TBulk : Activity.Bulk<TBulk, TItem>
-    where TItem : Activity.Buzz
+    where TItem : Activity.Item
 {
-    private BulkMath Math { get; } = new();
-
-    protected override string Role => "bulk";
-
     public override void LogProperties(PropertyName name, PushLogProperty push)
     {
         base.LogProperties(name, push);
 
-        foreach (var (key, value) in GetLogProperties.From(name, Math))
+        // TODO: Move framework property collection out of scopes with the CreateLogEntry migration.
+        foreach (var (key, value) in GetLogProperties.From(name, Activity.Math))
         {
             push(key, value);
         }
@@ -24,7 +21,7 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
 
     public ItemScope<TItem> BeginItem(TItem item)
     {
-        return new ItemScope<TItem>(Logger, item, Math.Count, Activity.StatusLogPolicy).Also(x => x.Push());
+        return new ItemScope<TItem>(Logger, item, Activity.Math.Count, Activity.StatusLogPolicy).Also(x => x.Push());
     }
 }
 
@@ -32,9 +29,6 @@ public sealed class ItemScope<TActivity>
 (
     ILogger logger,
     TActivity activity,
-    CountStatus<TActivity> count,
+    OnLastStatus<TActivity> onLast,
     StatusLogPolicy statusLogPolicy
-) : BuzzScope<TActivity>(logger, activity, statusLogPolicy, count) where TActivity : Activity.Buzz
-{
-    protected override string Role => "item";
-}
+) : BuzzScope<TActivity>(logger, activity, statusLogPolicy, onLast) where TActivity : Activity.Item;

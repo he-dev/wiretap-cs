@@ -8,14 +8,14 @@ public static class GetMessageParts
 {
     private static readonly ConcurrentDictionary<Type, Getter[]> Cache = new();
 
-    public static void From(
+    public static MessagePartMap From(
         PropertyName root,
-        IReadOnlyDictionary<string, object?> properties,
-        PushMessagePart push,
+        GetLogProperty get,
         params object?[] sources
     )
     {
-        var get = new GetLogProperty(name => properties.TryGetValue(name, out var value) ? value : null);
+        var parts = new MessagePartMap();
+        var push = new PushMessagePart(parts.Push);
 
         foreach (var source in sources)
         {
@@ -25,6 +25,8 @@ public static class GetMessageParts
                 ByAttribute(root, source, push);
             }
         }
+
+        return parts;
     }
 
     private static void ByInterface(PropertyName root, GetLogProperty get, object source, PushMessagePart push)

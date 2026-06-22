@@ -27,8 +27,6 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
 
     public static ActivityScope? Current => AmbientContext<ActivityScope>.Current;
 
-    protected abstract string Role { get; }
-
     public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {
         foreach (var ancestor in Ancestors.Reverse())
@@ -38,7 +36,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
 
         TraceHandle.LogProperties(name, push);
         push(name.Activity.Name, ActivityName);
-        push(name.Activity.Role, Role);
+        push(name.Activity.Role, Activity.Role);
         push(name.Activity.Depth, Depth);
         push(name.Activity.Path, Path);
     }
@@ -79,18 +77,5 @@ public abstract class ActivityScope<TActivity>(TActivity activity) : ActivitySco
         {
             push(name.Activity.Tags, Activity.Tags);
         }
-    }
-}
-
-internal record ActivityDurationSource(TimeSpan Duration) : ILogPropertySource
-{
-    public sealed record Zero() : ActivityDurationSource(TimeSpan.Zero);
-
-    // core: Freezes the duration because the last activity may be logged later than set.
-    public static ActivityDurationSource Freeze(TimeSpan duration) => new(duration);
-
-    public void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        push(name.Activity.DurationMs, (long)Duration.TotalMilliseconds);
     }
 }

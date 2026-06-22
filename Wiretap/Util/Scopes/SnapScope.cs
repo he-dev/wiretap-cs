@@ -6,18 +6,10 @@ namespace Wiretap.Util.Scopes;
 
 public class SnapScope<TActivity>(ILogger logger, TActivity activity) : ActivityScope<TActivity>(activity) where TActivity : Activity.Snap
 {
-    protected override string Role => "snap";
-
     internal static void Log(ILogger logger, TActivity activity, ActivityStatus<TActivity> status)
     {
         using var scope = new SnapScope<TActivity>(logger, activity).Also(x => x.Push());
         scope.Log(status);
-    }
-
-    public override void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        base.LogProperties(name, push);
-        push(name.Activity.DurationMs, 0L);
     }
 
     private void Log(ActivityStatus<TActivity> status)
@@ -26,7 +18,17 @@ public class SnapScope<TActivity>(ILogger logger, TActivity activity) : Activity
             $"{ActivityName}.{status.GetType().Name}",
             $"{ActivityName}.{status.Code}"
         );
-        logger.LogEntry(Variant.CreateLogEntryBy.From(this, status));
+        if (!Activity.SetStatus(status))
+        {
+            Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
+                Activity.Name,
+                Activity.Status.Code,
+                status.Code
+            );
+            return;
+        }
+
+        logger.LogEntry(Variant.CreateLogEntryBy.From(this));
 
         TraceHandle.Stop(ok: status switch
         {

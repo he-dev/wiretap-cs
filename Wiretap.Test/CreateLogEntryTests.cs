@@ -13,7 +13,8 @@ public sealed class CreateLogEntryTests
         using var parent = NullLogger<ParentActivity>.Instance.BeginBuzz(new ParentActivity());
         using var child = NullLogger<ChildActivity>.Instance.BeginBuzz(new ChildActivity());
 
-        var entry = CreateLogEntry.By().From(child, new ChildActivity.Okay());
+        child.SetStatus(new ChildActivity.Okay());
+        var entry = CreateLogEntry.Default.From(child);
 
         Assert.Equal("parent", entry["wiretap.activity.state.ancestor"]);
         Assert.False(entry.ContainsKey("wiretap.activity.state.local_only"));

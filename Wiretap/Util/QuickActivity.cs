@@ -83,8 +83,47 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     }
 }
 
+public class QuickItem(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    : Activity.Item, IMessagePartFeed
+{
+    // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
+    public override string Name => name;
+
+    public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+    {
+        push(root.Activity.Append("message"), message, args);
+    }
+
+    public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
+        : ActivityStatus<QuickItem>.Okay, IMessagePartFeed
+    {
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+        {
+            push(root.Activity.Status.Append("message"), message, args);
+        }
+    }
+
+    public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
+        : ActivityStatus<QuickItem>.Noop, IMessagePartFeed
+    {
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+        {
+            push(root.Activity.Status.Append("message"), message, args);
+        }
+    }
+
+    public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
+        : ActivityStatus<QuickItem>.Fail, IMessagePartFeed
+    {
+        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+        {
+            push(root.Activity.Status.Append("message"), message, args);
+        }
+    }
+}
+
 public class QuickBulk(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Bulk<QuickBulk, QuickBuzz>(StatusLogPolicy.Last), IMessagePartFeed
+    : Activity.Bulk<QuickBulk, QuickItem>(StatusLogPolicy.Last), IMessagePartFeed
 {
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;

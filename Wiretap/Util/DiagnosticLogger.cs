@@ -8,7 +8,7 @@ public sealed class DiagnosticLogger(ILogger logger) : ILogger
 {
     private readonly UniqueKeys<Warning> _warnings = new();
 
-    public static DiagnosticLogger None { get; } = new(NullLogger.Instance);
+    public static DiagnosticLogger Noop { get; } = new(NullLogger.Instance);
 
     public void WarnOnce(string contract, object key, Action<ILogger> write)
     {
