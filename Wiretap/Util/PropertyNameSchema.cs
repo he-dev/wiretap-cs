@@ -1,14 +1,25 @@
 namespace Wiretap.Util;
 
-public readonly record struct PropertyName(string Separator = ".", params string[] Parts) : IFormattable
+public readonly record struct PropertyName : IFormattable
 {
+    public PropertyName(params string[] parts)
+    {
+        Parts = [.. parts.SelectMany(part => part.Split('.'))];
+    }
+
+    private PropertyName(IEnumerable<string> parts)
+    {
+        Parts = [.. parts];
+    }
+
+    public string[] Parts { get; }
+
     public bool Equals(PropertyName other) =>
-        Separator == other.Separator && Parts.AsSpan().SequenceEqual(other.Parts);
+        Parts.AsSpan().SequenceEqual(other.Parts);
 
     public override int GetHashCode()
     {
         var hash = new HashCode();
-        hash.Add(Separator, StringComparer.Ordinal);
         foreach (var part in Parts)
         {
             hash.Add(part, StringComparer.Ordinal);
@@ -19,12 +30,22 @@ public readonly record struct PropertyName(string Separator = ".", params string
 
     public PropertyName Append(params string[] parts)
     {
-        return this with { Parts = [..Parts, ..parts] };
+        return new PropertyName([..Parts, ..parts.SelectMany(part => part.Split('.'))]);
+    }
+
+    public static PropertyName Parse(string value)
+    {
+        return new PropertyName(value);
+    }
+
+    public static PropertyName operator +(PropertyName left, PropertyName right)
+    {
+        return new PropertyName([..left.Parts, ..right.Parts]);
     }
 
     public override string ToString()
     {
-        return string.Join(Separator, Parts);
+        return string.Join(".", Parts);
     }
 
     public string ToString(string? format, IFormatProvider? formatProvider)

@@ -11,7 +11,7 @@ public sealed record CreateLogEntry
 )
 {
     public static CreateLogEntry Default { get; } = new(
-        new PropertyName(Parts: ["wiretap"]),
+        new PropertyName("wiretap"),
         new ArrangeMessageParts(),
         new JoinMessagePartsByAppending(),
         DefaultMessageParts.All
