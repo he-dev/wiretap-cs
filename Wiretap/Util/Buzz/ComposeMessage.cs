@@ -129,6 +129,8 @@ public sealed class MessagePartBuilder
     private readonly object? _value;
     private string? _format;
     private string? _label;
+    private QuoteStyle _quoteStyle = QuoteStyle.Double;
+    private QuoteMode _quoteMode = QuoteMode.Never;
     private string _separator = ": ";
 
     internal MessagePartBuilder(PropertyName name, object? value, Action<PropertyName, MessageTemplate> push)
@@ -162,6 +164,14 @@ public sealed class MessagePartBuilder
         return this;
     }
 
+    public MessagePartBuilder Quote(QuoteMode mode, QuoteStyle style = QuoteStyle.Double)
+    {
+        _quoteMode = mode;
+        _quoteStyle = style;
+        Render();
+        return this;
+    }
+
     public MessagePartBuilder Template([StructuredMessageTemplate] string? message, params object?[] args)
     {
         _push(Name, new MessageTemplate(message, args));
@@ -171,6 +181,21 @@ public sealed class MessagePartBuilder
     private void Render()
     {
         var placeholder = _format is null ? $"{Name:_}" : Name.ToString(_format, null);
+        var quote = _quoteStyle switch
+        {
+            QuoteStyle.Double => '"',
+            QuoteStyle.Single => '\'',
+            _ => '"'
+        };
+        var shouldQuote = _quoteMode switch
+        {
+            QuoteMode.Never => false,
+            QuoteMode.Auto => _value?.ToString()?.Any(char.IsWhiteSpace) == true,
+            QuoteMode.Always => true,
+            _ => false
+        };
+
+        placeholder = shouldQuote ? $"{quote}{placeholder}{quote}" : placeholder;
 
         Template(
             _label is null ? placeholder : $"{_label}{_separator}{placeholder}",

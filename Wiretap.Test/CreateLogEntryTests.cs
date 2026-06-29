@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Wiretap.Core;
 using Wiretap.Util;
@@ -23,30 +24,67 @@ public sealed class CreateLogEntryTests
         Assert.False(entry.ContainsKey("wiretap.activity.state.optional"));
     }
 
+    [Fact]
+    public void RemarksCanQuoteMessageParts()
+    {
+        var logger = new CaptureLogger();
+
+        logger.LogSnap(new QuoteRecord(), new QuoteRecord.Okay());
+
+        var message = Assert.Single(logger.Messages);
+        Assert.Contains("Path: \"customer records.csv\"", message, StringComparison.Ordinal);
+        Assert.Contains("Code: 'A42'", message, StringComparison.Ordinal);
+    }
+
     private sealed class ParentActivity : Activity.Buzz
     {
-        [StateItem("ancestor", Cascade = true)]
+        [Detail("ancestor", Cascade = true)]
         public string Ancestor => "parent";
 
-        [StateItem("local_only")]
+        [Detail("local_only")]
         public string LocalOnly => "parent";
     }
 
     private sealed class ChildActivity : Activity.Buzz
     {
-        [StateItem("shared")]
+        [Detail("shared")]
         public string Shared => "activity";
 
-        [StateItem("optional")]
+        [Detail("optional")]
         public string? Optional => null;
 
-        [StateItem("private_value")]
+        [Detail("private_value")]
         private string PrivateValue => "hidden";
 
         public sealed class Okay : ActivityStatus<ChildActivity>.Okay
         {
-            [StateItem("shared")]
+            [Detail("shared")]
             public string Shared => "status";
+        }
+    }
+
+    private sealed class QuoteRecord : Activity.Snap
+    {
+        [Remark("Path", QuoteMode = QuoteMode.Auto)]
+        public string Path => "customer records.csv";
+
+        [Remark("Code", QuoteStyle = QuoteStyle.Single, QuoteMode = QuoteMode.Always)]
+        public string Code => "A42";
+
+        public sealed class Okay : ActivityStatus<QuoteRecord>.Okay;
+    }
+
+    private sealed class CaptureLogger : ILogger<QuoteRecord>
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
         }
     }
 }

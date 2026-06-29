@@ -36,7 +36,16 @@ public abstract class Activity
         }
 
         _status = status;
+        if (status is ActivityStatusRole.ILast)
+        {
+            OnLastStatusChange();
+        }
+
         return true;
+    }
+
+    protected virtual void OnLastStatusChange()
+    {
     }
 
     public abstract class Buzz : Activity
@@ -51,15 +60,9 @@ public abstract class Activity
 
         internal void Start() => _stopwatch.Start();
 
-        internal override bool SetStatus(ActivityStatus status)
+        protected override void OnLastStatusChange()
         {
-            if (!base.SetStatus(status))
-            {
-                return false;
-            }
-
             Duration = _stopwatch.Elapsed;
-            return true;
         }
     }
 

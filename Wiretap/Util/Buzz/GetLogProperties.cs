@@ -59,7 +59,7 @@ public static class GetLogProperties
         bool cascadingOnly = false
     )
     {
-        var getters = Cache.GetOrAdd(source.GetType(), DiscoverStateItems);
+        var getters = Cache.GetOrAdd(source.GetType(), DiscoverDetails);
 
         foreach (var getter in getters)
         {
@@ -70,18 +70,18 @@ public static class GetLogProperties
         }
     }
 
-    private static Getter[] DiscoverStateItems(Type type)
+    private static Getter[] DiscoverDetails(Type type)
     {
         // todo: Warn through the diagnostic logger when annotated non-public properties are ignored.
         const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
 
-        var stateItemGetters =
+        var detailGetters =
             from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<StateItem>()
+            let attr = property.GetCustomAttribute<Detail>()
             where attr is not null
             select new Getter(attr.Name ?? property.Name, attr.Cascade, Getter.Compile(type, property));
 
-        return [..stateItemGetters];
+        return [..detailGetters];
     }
 
     private sealed record Getter(string Name, bool Cascade, Func<object, object?> GetValue)
@@ -90,7 +90,7 @@ public static class GetLogProperties
         {
             if (!property.CanRead)
             {
-                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(StateItem)}' but does not have a getter.");
+                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(Detail)}' but does not have a getter.");
             }
 
             var source = Expression.Parameter(typeof(object), "source");

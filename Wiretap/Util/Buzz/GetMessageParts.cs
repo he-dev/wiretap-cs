@@ -39,7 +39,7 @@ public static class GetMessageParts
 
     private static void ByAttribute<T>(PropertyName root, T source, PushMessagePart push) where T : notnull
     {
-        var getters = Cache.GetOrAdd(source.GetType(), DiscoverMessageParts);
+        var getters = Cache.GetOrAdd(source.GetType(), DiscoverRemarks);
 
         foreach (var getter in getters)
         {
@@ -50,31 +50,36 @@ public static class GetMessageParts
                 {
                     part.Label(label).Separator(getter.Attribute.Separator ?? ": ");
                 }
+                if (getter.Attribute.Format is { } format)
+                {
+                    part.Format(format);
+                }
+                part.Quote(getter.Attribute.QuoteMode, getter.Attribute.QuoteStyle);
             }
         }
     }
 
-    private static Getter[] DiscoverMessageParts(Type type)
+    private static Getter[] DiscoverRemarks(Type type)
     {
         // todo: Warn through the diagnostic logger when annotated non-public properties are ignored.
         const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;
 
-        var messagePartGetters =
+        var remarkGetters =
             from property in type.GetProperties(flags)
-            let attr = property.GetCustomAttribute<MessagePart>()
+            let attr = property.GetCustomAttribute<Remark>()
             where attr is not null
             select new Getter(property.Name, attr, Getter.Compile(type, property));
 
-        return [..messagePartGetters];
+        return [..remarkGetters];
     }
 
-    private sealed record Getter(string PropertyName, MessagePart Attribute, Func<object, object?> GetValue)
+    private sealed record Getter(string PropertyName, Remark Attribute, Func<object, object?> GetValue)
     {
         public static Func<object, object?> Compile(Type type, PropertyInfo property)
         {
             if (!property.CanRead)
             {
-                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(MessagePart)}' but does not have a getter.");
+                throw new InvalidOperationException($"The property '{type.Name}.{property.Name}' is marked with '{nameof(Remark)}' but does not have a getter.");
             }
 
             var source = Expression.Parameter(typeof(object), "source");

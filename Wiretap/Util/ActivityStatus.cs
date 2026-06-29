@@ -37,7 +37,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Error;
 
-        [MessagePart("Exception")]
+        [Remark("Exception")]
         public string? ExceptionMessage => Exception?.Message;
     }
 
@@ -48,7 +48,7 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
 
         public override LogLevel Level => LogLevel.Warning;
 
-        [MessagePart]
+        [Remark]
         public string Reason => "The activity scope exited without an explicit last status.";
     }
 }
