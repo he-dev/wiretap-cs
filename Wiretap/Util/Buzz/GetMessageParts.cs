@@ -15,7 +15,7 @@ public static class GetMessageParts
     )
     {
         var parts = new MessagePartMap();
-        var push = new PushMessagePart(parts.Push);
+        var push = new PushMessagePart(get, parts);
 
         foreach (var source in sources)
         {
@@ -45,11 +45,11 @@ public static class GetMessageParts
         {
             if (getter.GetValue(source) is { } value)
             {
-                push(
-                    root.Activity.State.Append(getter.PropertyName),
-                    getter.Template(root.Activity.State),
-                    value
-                );
+                var part = push.Discrete(root.Activity.State.Append(getter.PropertyName), value);
+                if (getter.Attribute.Label is { } label)
+                {
+                    part.Label(label).Separator(getter.Attribute.Separator ?? ": ");
+                }
             }
         }
     }
@@ -68,26 +68,8 @@ public static class GetMessageParts
         return [..messagePartGetters];
     }
 
-    private static string TemplateFor(PropertyName prefix, string propertyName, MessagePart attr)
-    {
-        var key = prefix.Append(propertyName);
-
-        if (attr.Label is null)
-        {
-            return $"{key:_}";
-        }
-
-        var label = attr.Label == string.Empty ? propertyName : attr.Label;
-        return $"{label}{attr.Separator}{key:_}";
-    }
-
     private sealed record Getter(string PropertyName, MessagePart Attribute, Func<object, object?> GetValue)
     {
-        public string Template(PropertyName prefix)
-        {
-            return TemplateFor(prefix, PropertyName, Attribute);
-        }
-
         public static Func<object, object?> Compile(Type type, PropertyInfo property)
         {
             if (!property.CanRead)

@@ -38,11 +38,7 @@ public class DeleteFile : Activity.Item
 
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(
-                root.Activity.State.Append("Reason"),
-                $"Reason: {root.Activity.State.Append("Reason"):_}",
-                Reason
-            );
+            push.Discrete(root.Activity.State.Append("Reason"), Reason).Label("Reason");
         }
 
         public sealed class NotFound : DeleteFile.Noop

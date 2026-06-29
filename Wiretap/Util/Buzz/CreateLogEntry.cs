@@ -33,9 +33,10 @@ public sealed record CreateLogEntry
         }
         var get = new GetLogProperty(properties.GetValueOrDefault);
         var messageParts = GetMessageParts.From(Root, get, scope.Activity, status);
+        var push = new PushMessagePart(get, messageParts);
         foreach (var registration in MessagePartRegistrations)
         {
-            registration(Root, get, messageParts.Push);
+            registration(Root, get, push);
         }
 
         var message = JoinMessageParts.By(ArrangeMessageParts.By(Root, messageParts));

@@ -12,7 +12,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts carry their optional structured message as contract data.
     public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
-        push(root.Activity.Append("message"), message, args);
+        push.Discrete(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -20,7 +20,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -29,7 +29,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -38,7 +38,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 }
@@ -52,7 +52,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts carry their optional structured message as contract data.
     public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
-        push(root.Activity.Append("message"), message, args);
+        push.Discrete(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -60,7 +60,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -69,7 +69,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -78,7 +78,7 @@ public class QuickSnap(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 }
@@ -91,7 +91,7 @@ public class QuickItem(string name, [StructuredMessageTemplate] string? message 
 
     public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
-        push(root.Activity.Append("message"), message, args);
+        push.Discrete(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -99,7 +99,7 @@ public class QuickItem(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -108,7 +108,7 @@ public class QuickItem(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -117,7 +117,7 @@ public class QuickItem(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 }
@@ -133,7 +133,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     // core: Quick contracts carry their optional structured message as contract data.
     public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
-        push(root.Activity.Append("message"), message, args);
+        push.Discrete(root.Activity.Append("message"), message, args);
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
@@ -141,7 +141,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -150,7 +150,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 
@@ -159,7 +159,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     {
         public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
         {
-            push(root.Activity.Status.Append("message"), message, args);
+            push.Discrete(root.Activity.Status.Append("message"), message, args);
         }
     }
 }

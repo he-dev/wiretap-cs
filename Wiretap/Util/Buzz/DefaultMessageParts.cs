@@ -14,7 +14,7 @@ internal static class DefaultMessageParts
 
     private static void PushActivityHeader(PropertyName root, GetLogProperty get, PushMessagePart push)
     {
-        push(
+        push.Discrete(
             root.Activity.Name,
             $"{root.Activity.Name:_}[{root.Activity.Status.Code:_}]",
             get(root.Activity.Name),
@@ -26,11 +26,11 @@ internal static class DefaultMessageParts
     {
         if (get(root.Activity.Role) is "snap")
         {
-            push(root.Activity.DurationMs, "Duration: N/A");
+            push.Discrete(root.Activity.DurationMs, "Duration: N/A");
             return;
         }
 
-        push(
+        push.Discrete(
             root.Activity.DurationMs,
             $"Duration: {root.Activity.DurationMs:N0} ms",
             get(root.Activity.DurationMs)
@@ -51,7 +51,7 @@ internal static class DefaultMessageParts
 
             var rateName = state.Append($"{code}_rate");
             var label = CultureInfo.InvariantCulture.TextInfo.ToTitleCase(code);
-            push(
+            push.Discrete(
                 state.Append(code),
                 $"{label}: {rateName:P1} ({countName:_} of {state.Append("item_count"):_})",
                 get(rateName),
@@ -60,7 +60,7 @@ internal static class DefaultMessageParts
             );
         }
 
-        push(
+        push.Discrete(
             state.Append("throughput_s"),
             $"Throughput: {state.Append("throughput_s"):N1}/s",
             get(state.Append("throughput_s"))
