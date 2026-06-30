@@ -21,19 +21,20 @@ public sealed class DetailBuilder(
         var options = new DetailOptions();
         configure?.Invoke(options);
 
-        if (level != 0 && !options.Cascade)
+        if (level == 0 || options.Cascade)
         {
-            return;
-        }
-
-        var key = (root + name).ToString();
-        if (!details.TryGetValue(key, out var current))
-        {
-            details[key] = value;
-        }
-        else if (current is null && value is not null)
-        {
-            details[key] = value;
+            var key = (root + name).ToString();
+            if (!details.TryGetValue(key, out var current))
+            {
+                details[key] = value;
+            }
+            else
+            {
+                if (current is null && value is not null)
+                {
+                    details[key] = value;
+                }
+            }
         }
     }
 }
