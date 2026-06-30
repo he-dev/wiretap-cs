@@ -123,12 +123,12 @@ public class QuickItem(string name, [StructuredMessageTemplate] string? message 
 }
 
 public class QuickBulk(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Bulk<QuickBulk, QuickItem>(StatusLogPolicy.Last), IMessagePartFeed
+    : Activity.Bulk<QuickBulk, QuickItem>(OmitStatus.First), IMessagePartFeed
 {
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;
 
-    public override StatusLogPolicy StatusLogPolicy { get; init; } = StatusLogPolicy.Last;
+    public override OmitStatus OmitStatus { get; init; } = OmitStatus.First;
 
     // core: Quick contracts carry their optional structured message as contract data.
     public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)

@@ -9,7 +9,7 @@ public class BuzzScope<TActivity>
 (
     ILogger logger,
     TActivity activity,
-    StatusLogPolicy statusLogPolicy = StatusLogPolicy.Both,
+    OmitStatus omitStatus = OmitStatus.None,
     OnLastStatus<TActivity>? onLastStatus = null
 ) : ActivityScope<TActivity>(activity) where TActivity : Activity.Buzz
 {
@@ -43,7 +43,7 @@ public class BuzzScope<TActivity>
         base.Push();
         Activity.SetStatus(new ActivityStatus<TActivity>.Ready());
 
-        if (statusLogPolicy.HasFlag(StatusLogPolicy.First))
+        if (!omitStatus.HasFlag(OmitStatus.First))
         {
             LogStatus();
         }
@@ -70,7 +70,7 @@ public class BuzzScope<TActivity>
                 _ => null
             });
 
-            if (statusLogPolicy.HasFlag(StatusLogPolicy.Last))
+            if (!omitStatus.HasFlag(OmitStatus.Last))
             {
                 LogStatus();
             }

@@ -3,7 +3,7 @@ using Wiretap.Util.Buzz;
 namespace Wiretap.Util;
 
 [Flags]
-public enum StatusLogPolicy
+public enum OmitStatus
 {
     None = 0x0,
     First = 0x1,
@@ -28,7 +28,7 @@ public abstract class Activity
 
     internal ActivityStatus Status => _status ?? throw new InvalidOperationException("The activity has not started.");
 
-    internal virtual bool SetStatus(ActivityStatus status)
+    internal bool SetStatus(ActivityStatus status)
     {
         if (_status is ActivityStatusRole.ILast)
         {
@@ -44,9 +44,7 @@ public abstract class Activity
         return true;
     }
 
-    protected virtual void OnLastStatusChange()
-    {
-    }
+    protected virtual void OnLastStatusChange() { }
 
     public abstract class Buzz : Activity
     {
@@ -77,14 +75,14 @@ public abstract class Activity
 
         public override string Role => "bulk";
 
-        public abstract StatusLogPolicy StatusLogPolicy { get; init; }
+        public abstract OmitStatus OmitStatus { get; init; }
     }
 
-    public abstract class Bulk<TBulk, TItem>(StatusLogPolicy statusLogPolicy) : Bulk
+    public abstract class Bulk<TBulk, TItem>(OmitStatus omitStatus) : Bulk
         where TBulk : Bulk<TBulk, TItem>
         where TItem : Item
     {
-        public override StatusLogPolicy StatusLogPolicy { get; init; } = statusLogPolicy;
+        public override OmitStatus OmitStatus { get; init; } = omitStatus;
     }
 
     public abstract class Snap : Activity

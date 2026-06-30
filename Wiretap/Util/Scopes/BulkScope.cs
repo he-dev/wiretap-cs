@@ -21,7 +21,7 @@ public sealed class BulkScope<TBulk, TItem>(ILogger logger, TBulk activity) : Bu
 
     public ItemScope<TItem> BeginItem(TItem item)
     {
-        return new ItemScope<TItem>(Logger, item, Activity.Math.Count, Activity.StatusLogPolicy).Also(x => x.Push());
+        return new ItemScope<TItem>(Logger, item, Activity.Math.Count, Activity.OmitStatus).Also(x => x.Push());
     }
 }
 
@@ -30,5 +30,5 @@ public sealed class ItemScope<TActivity>
     ILogger logger,
     TActivity activity,
     OnLastStatus<TActivity> onLast,
-    StatusLogPolicy statusLogPolicy
-) : BuzzScope<TActivity>(logger, activity, statusLogPolicy, onLast) where TActivity : Activity.Item;
+    OmitStatus omitStatus
+) : BuzzScope<TActivity>(logger, activity, omitStatus, onLast) where TActivity : Activity.Item;
