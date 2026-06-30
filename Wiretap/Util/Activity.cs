@@ -76,6 +76,18 @@ public abstract class Activity
         public override string Role => "bulk";
 
         public abstract OmitStatus OmitStatus { get; init; }
+
+        [Detail("bulk.item_count")]
+        [Remark("Item Count")]
+        public int ItemCount => Math.ItemCount;
+
+        [Detail("bulk.duration_s")]
+        [Remark("Item Duration", Format = "N3", QuoteMode = QuoteMode.Never)]
+        public double DurationS => Math.DurationMs / 1000.0;
+
+        [Detail("bulk.throughput_s")]
+        [Remark("Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
+        public double ThroughputS => Math.ThroughputMs * 1000.0;
     }
 
     public abstract class Bulk<TBulk, TItem>(OmitStatus omitStatus) : Bulk
