@@ -34,8 +34,7 @@ public class BuzzScope<TActivity>
         }
     }
 
-    private void LogStatus() =>
-        logger.LogEntry(Variant.CreateLogEntryBy.From(this));
+    private void LogStatus() => logger.LogEntry(Variant.CreateLogEntryBy.From(this));
 
     internal override void Push()
     {
