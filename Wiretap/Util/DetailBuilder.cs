@@ -23,7 +23,7 @@ public sealed class DetailBuilder(
 
         if (level == 0 || options.Cascade)
         {
-            var key = (root + name).ToString();
+            var key = (root + name);
             if (!details.TryGetValue(key, out var current))
             {
                 details.Put(key, value);

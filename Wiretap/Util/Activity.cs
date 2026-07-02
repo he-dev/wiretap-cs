@@ -30,6 +30,11 @@ public abstract class Activity
 
     internal bool SetStatus(ActivityStatus status)
     {
+        Util.Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+            $"{Name}.{status.GetType().Name}",
+            $"{Name}.{status.Code}"
+        );
+
         if (_status is ActivityStatusRole.ILast)
         {
             return false;

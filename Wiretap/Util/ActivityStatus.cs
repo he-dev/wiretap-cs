@@ -53,22 +53,11 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
     }
 }
 
-public abstract class ActivityStatus : ILogPropertySource
+public abstract class ActivityStatus
 {
     public abstract string Code { get; }
 
     public abstract LogLevel Level { get; }
 
     public Exception? Exception { get; init; }
-
-    public virtual void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        push(name.Activity.Status.Code, Code);
-        push(name.Activity.Status.Role, this switch
-        {
-            ActivityStatusRole.IFirst => "first",
-            ActivityStatusRole.ILast => "last",
-            _ => null
-        });
-    }
 }

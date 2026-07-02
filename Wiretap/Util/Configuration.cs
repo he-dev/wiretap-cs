@@ -4,12 +4,11 @@ using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public static class Configuration
+public class Configuration
 {
-    public sealed record Variant(CreateLogEntry CreateLogEntryBy)
-    {
-        public Variant() : this(CreateLogEntry.Default) { }
-    }
+    public PropertyName Root { get; init; } = new PropertyName("Wiretap");
+
+    public ComposeMessage2 ComposeMessage { get; init; } = new ComposeMessage2();
 
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class UseAttribute(string variant) : Attribute
@@ -20,20 +19,21 @@ public static class Configuration
     private abstract record Key
     {
         internal sealed record Default : Key;
+
         internal sealed record Named(string Value) : Key;
     }
 
     private static readonly Key DefaultKey = new Key.Default();
-    private static readonly ConcurrentDictionary<Key, Variant> Variants = new() { [DefaultKey] = new Variant() };
-    private static readonly ConcurrentDictionary<Type, Variant> Resolved = new();
+    private static readonly ConcurrentDictionary<Key, Configuration> Variants = new() { [DefaultKey] = new Configuration() };
+    private static readonly ConcurrentDictionary<Type, Configuration> Resolved = new();
 
     internal static DiagnosticLogger DiagnosticLogger { get; private set; } = DiagnosticLogger.Noop;
 
     public static ITraceContext TraceContext { get; private set; } = new TraceContext();
 
-    public static Variant Default => Variants[DefaultKey];
+    public static Configuration Default => Variants[DefaultKey];
 
-    public static Variant? Get(string name) => Variants.GetValueOrDefault(new Key.Named(name));
+    public static Configuration? Get(string name) => Variants.GetValueOrDefault(new Key.Named(name));
 
     public static void LogDiagnosticsWith(ILogger logger) => DiagnosticLogger = new DiagnosticLogger(logger);
 
@@ -42,24 +42,25 @@ public static class Configuration
 
     public static void UseTraceContext(ITraceContext traceContext) => TraceContext = traceContext;
 
-    public static void SetDefault(Func<Variant> variant)
+    public static void SetDefault(Func<Configuration> variant)
     {
         Variants[DefaultKey] = variant();
         Resolved.Clear();
     }
 
-    public static void AddNamed(string name, Func<Variant> variant)
+    public static void AddNamed(string name, Func<Configuration> variant)
     {
         if (!Variants.TryAdd(new Key.Named(name), variant()))
         {
             throw new InvalidOperationException($"Configuration variant '{name}' already exists.");
         }
+
         Resolved.Clear();
     }
 
-    public static Variant Resolve(Activity activity) => Resolved.GetOrAdd(activity.GetType(), Resolve);
+    public static Configuration Resolve(Activity activity) => Resolved.GetOrAdd(activity.GetType(), Resolve);
 
-    private static Variant Resolve(Type activityType)
+    private static Configuration Resolve(Type activityType)
     {
         var name = activityType.GetCustomAttributes(typeof(UseAttribute), false)
             .Cast<UseAttribute>()
@@ -75,10 +76,7 @@ public static class Configuration
             return variant;
         }
 
-        DiagnosticLogger.WarnAboutMissingConfigurationVariant(
-            name,
-            activityType.FullName ?? activityType.Name
-        );
+        DiagnosticLogger.WarnAboutMissingConfigurationVariant(name, activityType.FullName ?? activityType.Name);
         return Default;
     }
 }

@@ -7,34 +7,30 @@ public delegate void OnLastStatus<TActivity>(ActivityStatus<TActivity> status, T
 
 public class BuzzScope<TActivity>
 (
-    ILogger logger,
+    ActivityLogger logger,
     TActivity activity,
     OmitStatus omitStatus = OmitStatus.None,
     OnLastStatus<TActivity>? onLastStatus = null
-) : ActivityScope<TActivity>(activity) where TActivity : Activity.Buzz
+) : ActivityScope<TActivity>(logger, activity) where TActivity : Activity.Buzz
 {
     private bool _disposed;
 
-    protected ILogger Logger => logger;
-
     public void SetStatus(ActivityStatus<TActivity> status)
     {
-        Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+        Util.Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
             $"{ActivityName}.{status.GetType().Name}",
             $"{ActivityName}.{status.Code}"
         );
 
         if (!Activity.SetStatus(status))
         {
-            Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
+            Util.Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
                 Activity.Name,
                 Activity.Status.Code,
                 status.Code
             );
         }
     }
-
-    private void LogStatus() => logger.LogEntry(Variant.CreateLogEntryBy.From(this));
 
     internal override void Push()
     {

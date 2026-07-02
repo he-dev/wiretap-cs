@@ -11,12 +11,12 @@ public abstract class Workflow
     {
         public class Now : ExecuteStep
         {
-            [StateItem]
+            [Detail]
             public required int StepIndex { get; init; }
 
             public sealed class Okay : ActivityStatus<Now>.Okay
             {
-                [StateItem]
+                [Detail]
                 public required int ItemsProcessed { get; init; }
             }
 
@@ -29,7 +29,7 @@ public class DeleteFile : Activity.Item
 {
     public override string[] Tags { get; init; } = ["io"];
 
-    [MessagePart]
+    [Remark]
     public required string Path { get; init; }
 
     public class Noop : ActivityStatus<DeleteFile>.Noop, IMessagePartFeed
@@ -52,9 +52,9 @@ public class DeleteFile : Activity.Item
     public sealed class Fail : ActivityStatus<DeleteFile>.Fail;
 }
 
-public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(StatusLogPolicy.Last)
+public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(OmitStatus.Last)
 {
-    [MessagePart]
+    [Remark]
     public required string Path { get; init; }
 
     public sealed class Okay : ActivityStatus<DeleteFolder>.Okay;
@@ -64,7 +64,7 @@ public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(StatusLogP
 
 public class ValidateRecord : Activity.Snap
 {
-    [StateItem]
+    [Detail]
     public required string RecordId { get; init; }
 
     public sealed class Okay : ActivityStatus<ValidateRecord>.Okay;
@@ -74,13 +74,13 @@ public class ValidateRecord : Activity.Snap
     public sealed class Fail : ActivityStatus<ValidateRecord>.Fail;
 }
 
-public class CopyFile : Activity.Buzz, ILogPropertySource
+public class CopyFile : Activity.Buzz, IDetailSource
 {
-    [StateItem]
+    [Detail]
     public required string Path { get; init; }
 
-    public void LogProperties(PropertyName name, PushLogProperty push)
+    public void Details(DetailBuilder details)
     {
-        push(name.Activity.State.Append("CustomItem"), "CustomValue");
+        details.Add(new("CustomItem"), "CustomValue");
     }
 }

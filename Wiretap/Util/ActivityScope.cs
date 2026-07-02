@@ -1,18 +1,16 @@
 using System.Collections;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 
-public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDisposable, IEnumerable<ActivityScope>
+public abstract class ActivityScope(ActivityLogger logger, Activity activity) : IDisposable, IEnumerable<ActivityScope>
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
-    protected ITraceHandle TraceHandle { get; } = Configuration.TraceContext.Start(activity.Name);
+    protected ITraceHandle TraceHandle { get; } = Util.Configuration.TraceContext.Start(activity.Name);
 
-    protected Configuration.Variant Variant { get; } = Configuration.Resolve(activity);
+    protected Configuration Configuration { get; } = Util.Configuration.Resolve(activity);
 
     public Activity Activity { get; } = activity;
 
@@ -28,12 +26,10 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
 
     public static ActivityScope? Current => AmbientContext<ActivityScope>.Current;
 
-    protected void Log()
+    protected void LogStatus()
     {
-        // TODO: Replace the dummy logger when ActivityLogger is passed into ActivityScope.
-        var logger = new ActivityLogger(NullLogger.Instance);
-        var recipe = Variant.CreateLogEntryBy;
-        var root = recipe.Root;
+        var composeMessage = Configuration.ComposeMessage;
+        var root = Configuration.Root;
         var status = Activity.Status;
         var activities = this.Select(scope => scope.Activity).ToList();
 
@@ -52,7 +48,8 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
         details.Put(root.Activity.Tags, Activity.Tags.Length > 0 ? Activity.Tags : null);
         details.Put(root.Activity.DurationMs, Activity is Activity.Buzz buzz ? buzz.DurationMs : null);
 
-        TraceHandle.LogProperties(root, (name, value) => details.Put(name, value));
+        // todo: add each property
+        //TraceHandle.LogProperties(root, (name, value) => details.Put(name, value));
 
         foreach (var (source, level) in activities.Select((source, level) => (source, level)))
         {
@@ -72,24 +69,10 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
             status.Level,
             details
                 .Where(pair => pair.Value is not null)
-                .ToDictionary(pair => pair.Key, pair => pair.Value),
+                .ToDictionary(pair => pair.Key.ToString(), pair => pair.Value),
             message,
             status.Exception
         );
-    }
-
-    public virtual void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        foreach (var ancestor in Ancestors.Reverse())
-        {
-            GetLogProperties.ByAttribute(name.Activity.State, ancestor.Activity, push, cascadingOnly: true);
-        }
-
-        TraceHandle.LogProperties(name, push);
-        push(name.Activity.Name, ActivityName);
-        push(name.Activity.Role, Activity.Role);
-        push(name.Activity.Depth, Depth);
-        push(name.Activity.Path, Path);
     }
 
     internal virtual void Push()
@@ -117,16 +100,7 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public abstract class ActivityScope<TActivity>(TActivity activity) : ActivityScope(activity) where TActivity : Activity
+public abstract class ActivityScope<TActivity>(ActivityLogger logger, TActivity activity) : ActivityScope(logger, activity) where TActivity : Activity
 {
-    public new TActivity Activity => (TActivity)base.Activity;
-
-    public override void LogProperties(PropertyName name, PushLogProperty push)
-    {
-        base.LogProperties(name, push);
-        if (Activity.Tags.Length > 0)
-        {
-            push(name.Activity.Tags, Activity.Tags);
-        }
-    }
+    protected new TActivity Activity => (TActivity)base.Activity;
 }
