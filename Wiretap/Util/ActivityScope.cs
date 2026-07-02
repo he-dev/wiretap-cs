@@ -48,8 +48,9 @@ public abstract class ActivityScope(ActivityLogger logger, Activity activity) : 
         details.Put(root.Activity.Tags, Activity.Tags.Length > 0 ? Activity.Tags : null);
         details.Put(root.Activity.DurationMs, Activity is Activity.Buzz buzz ? buzz.DurationMs : null);
 
-        // todo: add each property
-        //TraceHandle.LogProperties(root, (name, value) => details.Put(name, value));
+        details.Put(root.TraceId, TraceHandle.TraceId);
+        details.Put(root.SpanId, TraceHandle.SpanId);
+        details.Put(root.ParentSpanId, TraceHandle.ParentSpanId);
 
         foreach (var (source, level) in activities.Select((source, level) => (source, level)))
         {

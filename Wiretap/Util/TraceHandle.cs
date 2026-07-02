@@ -5,11 +5,19 @@ namespace Wiretap.Util;
 
 public interface ITraceHandle : IDisposable
 {
+    string TraceId { get; }
+    string SpanId { get; }
+    string? ParentSpanId { get; }
+
     void Stop(bool? ok);
 }
 
 public class TraceHandle(System.Diagnostics.Activity activity) : ITraceHandle
 {
+    public string TraceId => activity.TraceId.ToHexString();
+    public string SpanId => activity.SpanId.ToHexString();
+    public string? ParentSpanId => activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString();
+
     public void Stop(bool? ok)
     {
         if (activity is { IsStopped: false })
@@ -35,6 +43,10 @@ public class TraceHandle(System.Diagnostics.Activity activity) : ITraceHandle
 
     public class Noop : ITraceHandle
     {
+        public string TraceId { get; } = string.Empty;
+        public string SpanId { get; } =  string.Empty;
+        public string? ParentSpanId { get; } = null;
+
         public void Stop(bool? ok) { }
         public void Dispose() { }
     }

@@ -9,6 +9,8 @@ public sealed class RemarkOptions
 
     public string Separator { get; set; } = ": ";
 
+    public string? Format { get; set; }
+
     public QuoteStyle QuoteStyle { get; set; } = QuoteStyle.Double;
 
     public QuoteMode QuoteMode { get; set; } = QuoteMode.Never;
@@ -65,6 +67,7 @@ public sealed class RemarkBuilder(PropertyName root, DetailCollection details, R
             _ => false
         };
 
+        value = options.Format switch { null => $"{value}", _ => $"{{{value}:{options.Format}}}" };
         value = shouldQuote ? $"{quote}{value}{quote}" : value;
         var label = options.Label ?? name.Parts.LastOrDefault() ?? name.ToString();
         return $"{label}{options.Separator}{value}";

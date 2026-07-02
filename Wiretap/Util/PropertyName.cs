@@ -1,32 +1,16 @@
 namespace Wiretap.Util;
 
-public readonly record struct PropertyName
+public readonly record struct PropertyName : IFormattable
 {
     public PropertyName(params string[] parts)
     {
         Parts = [.. parts.SelectMany(part => part.Split('.'))];
     }
 
-    private PropertyName(IEnumerable<string> parts)
-    {
-        Parts = [.. parts];
-    }
-
     public string[] Parts { get; }
 
-    public bool Equals(PropertyName other) =>
-        Parts.AsSpan().SequenceEqual(other.Parts);
+    public bool Equals(PropertyName other) => Parts.AsSpan().SequenceEqual(other.Parts);
 
-    public override int GetHashCode()
-    {
-        var hash = new HashCode();
-        foreach (var part in Parts)
-        {
-            hash.Add(part, StringComparer.Ordinal);
-        }
-
-        return hash.ToHashCode();
-    }
 
     public PropertyName Append(params string[] parts)
     {
@@ -43,9 +27,23 @@ public readonly record struct PropertyName
         return new PropertyName([..left.Parts, ..right.Parts]);
     }
 
-    public override string ToString()
+    public string ToString(string? format, IFormatProvider? formatProvider)
     {
-        return string.Join(".", Parts);
+        var name = string.Join(".", Parts);
+        return format switch { null => name, "." => $"{{{name}}}", _ => $"{{{name}:{format}}}" };
+    }
+
+    public override string ToString() => ToString(null, null);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        foreach (var part in Parts)
+        {
+            hash.Add(part, StringComparer.Ordinal);
+        }
+
+        return hash.ToHashCode();
     }
 
     public static implicit operator string(PropertyName value)
@@ -77,5 +75,11 @@ public static class PropertyNameExtensions
         public PropertyName Path => name.Append("path");
 
         public PropertyName DurationMs => name.Append("duration_ms");
+
+        public PropertyName TraceId => name.Append("trace_id");
+
+        public PropertyName SpanId => name.Append("span_id");
+
+        public PropertyName ParentSpanId => name.Append("parent_span_id");
     }
 }

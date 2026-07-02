@@ -59,7 +59,7 @@ public static class ComposeMessage2Remarks
         var activity = remarks.Root.Activity;
         remarks.Add(
             activity.Name,
-            $"{activity.Name:_}[{activity.Status.Code:_}]",
+            $"{activity.Name:.}[{activity.Status.Code:.}]",
             remarks.Details.GetValueOrDefault(activity.Name),
             remarks.Details.GetValueOrDefault(activity.Status.Code)
         );

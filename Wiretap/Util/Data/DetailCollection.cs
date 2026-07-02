@@ -9,8 +9,6 @@ public sealed class DetailCollection : IEnumerable<KeyValuePair<PropertyName, ob
         _details[name] = value;
     }
 
-    public bool ContainsKey(PropertyName key) => _details.ContainsKey(key);
-
     public object? GetValueOrDefault(PropertyName key)
     {
         return _details.GetValueOrDefault(key);

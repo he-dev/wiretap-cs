@@ -17,6 +17,7 @@ public static class CollectRemarks
                 {
                     options.Label = remark.Label;
                     options.Separator = remark.Separator ?? ": ";
+                    options.Format = remark.Format;
                     options.QuoteStyle = remark.QuoteStyle;
                     options.QuoteMode = remark.QuoteMode;
                 });
