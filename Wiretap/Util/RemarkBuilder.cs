@@ -1,4 +1,5 @@
 using JetBrains.Annotations;
+using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
@@ -7,8 +8,6 @@ public sealed class RemarkOptions
     public string? Label { get; set; }
 
     public string Separator { get; set; } = ": ";
-
-    public string? Format { get; set; }
 
     public QuoteStyle QuoteStyle { get; set; } = QuoteStyle.Double;
 
@@ -52,7 +51,6 @@ public sealed class RemarkBuilder(PropertyName root, DetailCollection details, R
             return null;
         }
 
-        var placeholder = options.Format is null ? $"{name:_}" : name.ToString(options.Format, null);
         var quote = options.QuoteStyle switch
         {
             QuoteStyle.Double => '"',
@@ -67,8 +65,8 @@ public sealed class RemarkBuilder(PropertyName root, DetailCollection details, R
             _ => false
         };
 
-        placeholder = shouldQuote ? $"{quote}{placeholder}{quote}" : placeholder;
+        value = shouldQuote ? $"{quote}{value}{quote}" : value;
         var label = options.Label ?? name.Parts.LastOrDefault() ?? name.ToString();
-        return $"{label}{options.Separator}{placeholder}";
+        return $"{label}{options.Separator}{value}";
     }
 }

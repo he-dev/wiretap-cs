@@ -1,123 +1,143 @@
-using System.Collections.Immutable;
-using JetBrains.Annotations;
+using System.Text;
+using Wiretap.Util.Data;
 
 namespace Wiretap.Util.Buzz;
 
-public delegate object? GetLogProperty(string name);
-
-public delegate void MessagePartRegistration(PropertyName root, GetLogProperty get, PushMessagePart push);
-
-public interface IMessagePartFeed
+public sealed class ComposeMessage
 {
-    void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push);
-}
-
-public sealed class PushMessagePart(GetLogProperty get, MessagePartMap parts)
-{
-    public MessagePartBuilder Property(PropertyName name)
+    private Action<RemarkBuilder> _remarks = remarks =>
     {
-        return new MessagePartBuilder(name, get(name), parts.Push);
+        remarks.AddActivity();
+        remarks.AddActivityDuration();
+    };
+
+    private Action<ArrangeRemarks> _arrange = arrange =>
+    {
+        arrange.Add(arrange.Root.Activity.Name);
+        arrange.Add(arrange.Root.Activity.DurationMs);
+        arrange.AddRemaining();
+    };
+
+    private Func<JoinRemarks, MessageTemplate> _join = join => join.JoinToString("; ");
+
+    public ComposeMessage Remarks(Action<RemarkBuilder> remarks)
+    {
+        _remarks = remarks;
+        return this;
     }
 
-    public MessagePartBuilder Discrete(PropertyName name, object? value)
+    public ComposeMessage Arrange(Action<ArrangeRemarks> arrange)
     {
-        return new MessagePartBuilder(name, value, parts.Push);
+        _arrange = arrange;
+        return this;
     }
 
-    public MessagePartBuilder Discrete
-    (
-        PropertyName name,
-        [StructuredMessageTemplate] string? message,
-        params object?[] args
+    public ComposeMessage Join(Func<JoinRemarks, MessageTemplate> join)
+    {
+        _join = join;
+        return this;
+    }
+
+    public MessageTemplate From(
+        PropertyName root,
+        DetailCollection details,
+        RemarkCollection remarks
     )
     {
-        if (args.Length == 0)
-        {
-            return Discrete(name, (object?)message);
-        }
+        _remarks(new RemarkBuilder(root, details, remarks));
 
-        return new MessagePartBuilder(name, args.Length == 1 ? args[0] : null, parts.Push)
-            .Template(message, args);
+        var arranged = new List<MessageTemplate>();
+        _arrange(new ArrangeRemarks(root, remarks, arranged));
+        return _join(new JoinRemarks(arranged));
     }
 }
 
-public sealed class MessagePartBuilder
+public static class ComposeMessage2Remarks
 {
-    private readonly Action<PropertyName, MessageTemplate> _push;
-    private readonly object? _value;
-    private string? _format;
-    private string? _label;
-    private QuoteStyle _quoteStyle = QuoteStyle.Double;
-    private QuoteMode _quoteMode = QuoteMode.Never;
-    private string _separator = ": ";
-
-    internal MessagePartBuilder(PropertyName name, object? value, Action<PropertyName, MessageTemplate> push)
+    public static void AddActivity(this RemarkBuilder remarks)
     {
-        Name = name;
-        _value = value;
-        _push = push;
-        Template(value?.ToString());
-    }
-
-    private PropertyName Name { get; }
-
-    public MessagePartBuilder Label(string label)
-    {
-        _label = label == string.Empty ? Name.Parts.LastOrDefault() ?? Name.ToString() : label;
-        Render();
-        return this;
-    }
-
-    public MessagePartBuilder Separator(string separator)
-    {
-        _separator = separator;
-        Render();
-        return this;
-    }
-
-    public MessagePartBuilder Format(string format)
-    {
-        _format = format;
-        Render();
-        return this;
-    }
-
-    public MessagePartBuilder Quote(QuoteMode mode, QuoteStyle style = QuoteStyle.Double)
-    {
-        _quoteMode = mode;
-        _quoteStyle = style;
-        Render();
-        return this;
-    }
-
-    public MessagePartBuilder Template([StructuredMessageTemplate] string? message, params object?[] args)
-    {
-        _push(Name, new MessageTemplate(message, args));
-        return this;
-    }
-
-    private void Render()
-    {
-        var placeholder = _format is null ? $"{Name:_}" : Name.ToString(_format, null);
-        var quote = _quoteStyle switch
-        {
-            QuoteStyle.Double => '"',
-            QuoteStyle.Single => '\'',
-            _ => '"'
-        };
-        var shouldQuote = _quoteMode switch
-        {
-            QuoteMode.Never => false,
-            QuoteMode.Auto => _value?.ToString()?.Any(char.IsWhiteSpace) == true,
-            QuoteMode.Always => true,
-            _ => false
-        };
-
-        placeholder = shouldQuote ? $"{quote}{placeholder}{quote}" : placeholder;
-
-        Template(
-            _label is null ? placeholder : $"{_label}{_separator}{placeholder}",
-            _value
+        var activity = remarks.Root.Activity;
+        remarks.Add(
+            activity.Name,
+            $"{activity.Name:_}[{activity.Status.Code:_}]",
+            remarks.Details.GetValueOrDefault(activity.Name),
+            remarks.Details.GetValueOrDefault(activity.Status.Code)
         );
+    }
+
+    public static void AddActivityDuration(this RemarkBuilder remarks)
+    {
+        var duration = remarks.Root.Activity.DurationMs;
+        remarks.Add(
+            duration,
+            remarks.Details.GetValueOrDefault(remarks.Root.Activity.Role) is "snap"
+                ? "Duration: N/A"
+                : $"Duration: {duration:N0} ms",
+            remarks.Details.GetValueOrDefault(duration)
+        );
+    }
+}
+
+public sealed class ArrangeRemarks(
+    PropertyName root,
+    RemarkCollection remarks,
+    List<MessageTemplate> arranged
+)
+{
+    public PropertyName Root { get; } = root;
+
+    public void Add(PropertyName name)
+    {
+        if (remarks.Pop(name) is { } remark)
+        {
+            arranged.Add(remark);
+        }
+    }
+
+    public void AddRemaining()
+    {
+        arranged.AddRange(remarks.Select(x => x.Value));
+        remarks.Clear();
+    }
+}
+
+public sealed class JoinRemarks(IReadOnlyList<MessageTemplate> remarks) : IReadOnlyList<MessageTemplate>
+{
+    public MessageTemplate this[int index] => remarks[index];
+
+    public int Count => remarks.Count;
+
+    public IEnumerator<MessageTemplate> GetEnumerator() => remarks.GetEnumerator();
+
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
+
+    public MessageTemplate JoinToString(string separator)
+    {
+        var template = new StringBuilder(256);
+        var args = new List<object?>(32);
+        foreach (var remark in remarks)
+        {
+            if (string.IsNullOrEmpty(remark.Template))
+            {
+                continue;
+            }
+
+            template.Append(template.Length == 0 ? string.Empty : separator);
+            template.Append(remark.Template);
+            args.AddRange(remark.Args);
+        }
+
+        return new MessageTemplate(template.ToString(), [.. args]);
+    }
+}
+
+internal static class RemarkCollectionExtensions
+{
+    public static void Clear(this RemarkCollection remarks)
+    {
+        foreach (var name in remarks.Select(x => x.Key).ToList())
+        {
+            remarks.Pop(name);
+        }
     }
 }

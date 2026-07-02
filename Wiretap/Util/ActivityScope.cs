@@ -1,6 +1,7 @@
 using System.Collections;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz;
+using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
@@ -28,7 +29,6 @@ public abstract class ActivityScope(ActivityLogger logger, Activity activity) : 
 
     protected void LogStatus()
     {
-        var composeMessage = Configuration.ComposeMessage;
         var root = Configuration.Root;
         var status = Activity.Status;
         var activities = this.Select(scope => scope.Activity).ToList();
@@ -64,7 +64,7 @@ public abstract class ActivityScope(ActivityLogger logger, Activity activity) : 
             CollectRemarks.From(builder, source);
         }
 
-        var message = ComposeMessage2.Default.From(root, details, remarks);
+        var message = Configuration.ComposeMessage.From(root, details, remarks);
         logger.Log(
             status.Level,
             details

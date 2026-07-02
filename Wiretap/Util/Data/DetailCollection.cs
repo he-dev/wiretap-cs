@@ -1,4 +1,4 @@
-﻿namespace Wiretap.Util;
+﻿namespace Wiretap.Util.Data;
 
 public sealed class DetailCollection : IEnumerable<KeyValuePair<PropertyName, object?>>
 {

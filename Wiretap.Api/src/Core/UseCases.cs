@@ -32,13 +32,13 @@ public class DeleteFile : Activity.Item
     [Remark]
     public required string Path { get; init; }
 
-    public class Noop : ActivityStatus<DeleteFile>.Noop, IMessagePartFeed
+    public class Noop : ActivityStatus<DeleteFile>.Noop, IRemarkSource
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
-        public void MessageParts(PropertyName root, GetLogProperty get, PushMessagePart push)
+        public void Remarks(RemarkBuilder remarks)
         {
-            push.Discrete(root.Activity.State.Append("Reason"), Reason).Label("Reason");
+            remarks.Add(new("Reason"), Reason, options => options.Label = "Reason");
         }
 
         public sealed class NotFound : DeleteFile.Noop

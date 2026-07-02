@@ -8,7 +8,7 @@ public class Configuration
 {
     public PropertyName Root { get; init; } = new PropertyName("Wiretap");
 
-    public ComposeMessage2 ComposeMessage { get; init; } = new ComposeMessage2();
+    public ComposeMessage ComposeMessage { get; init; } = new ComposeMessage();
 
     [AttributeUsage(AttributeTargets.Class, Inherited = false)]
     public sealed class UseAttribute(string variant) : Attribute
@@ -16,24 +16,21 @@ public class Configuration
         public string Variant { get; } = variant;
     }
 
-    private abstract record Key
+    private record Key(string Name)
     {
-        internal sealed record Default : Key;
-
-        internal sealed record Named(string Value) : Key;
+        internal static readonly Key Default = new Key(string.Empty);
     }
 
-    private static readonly Key DefaultKey = new Key.Default();
-    private static readonly ConcurrentDictionary<Key, Configuration> Variants = new() { [DefaultKey] = new Configuration() };
+    private static readonly ConcurrentDictionary<Key, Configuration> Variants = new() { [Key.Default] = new Configuration() };
     private static readonly ConcurrentDictionary<Type, Configuration> Resolved = new();
 
     internal static DiagnosticLogger DiagnosticLogger { get; private set; } = DiagnosticLogger.Noop;
 
     public static ITraceContext TraceContext { get; private set; } = new TraceContext();
 
-    public static Configuration Default => Variants[DefaultKey];
+    public static Configuration Default => Variants[Key.Default];
 
-    public static Configuration? Get(string name) => Variants.GetValueOrDefault(new Key.Named(name));
+    public static Configuration? Get(string name) => Variants.GetValueOrDefault(new Key(name));
 
     public static void LogDiagnosticsWith(ILogger logger) => DiagnosticLogger = new DiagnosticLogger(logger);
 
@@ -44,13 +41,13 @@ public class Configuration
 
     public static void SetDefault(Func<Configuration> variant)
     {
-        Variants[DefaultKey] = variant();
+        Variants[Key.Default] = variant();
         Resolved.Clear();
     }
 
     public static void AddNamed(string name, Func<Configuration> variant)
     {
-        if (!Variants.TryAdd(new Key.Named(name), variant()))
+        if (!Variants.TryAdd(new Key(name), variant()))
         {
             throw new InvalidOperationException($"Configuration variant '{name}' already exists.");
         }

@@ -1,4 +1,4 @@
-﻿namespace Wiretap.Util;
+﻿namespace Wiretap.Util.Data;
 
 public sealed class RemarkCollection : IEnumerable<KeyValuePair<PropertyName, MessageTemplate>>
 {

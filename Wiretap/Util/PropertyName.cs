@@ -1,6 +1,6 @@
 namespace Wiretap.Util;
 
-public readonly record struct PropertyName : IFormattable
+public readonly record struct PropertyName
 {
     public PropertyName(params string[] parts)
     {
@@ -46,18 +46,6 @@ public readonly record struct PropertyName : IFormattable
     public override string ToString()
     {
         return string.Join(".", Parts);
-    }
-
-    public string ToString(string? format, IFormatProvider? formatProvider)
-    {
-        var name = ToString();
-
-        return format switch
-        {
-            null or "" => name,
-            "_" => $"{{{name}}}",
-            _ => $"{{{name}:{format}}}"
-        };
     }
 
     public static implicit operator string(PropertyName value)
