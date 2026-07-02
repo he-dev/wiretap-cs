@@ -2,12 +2,12 @@ namespace Wiretap.Util.Buzz;
 
 public static class GetAnnotatedDetails
 {
-    public static Dictionary<string, object?> From(
+    public static DetailCollection From(
         PropertyName root,
         IEnumerable<object?> sources
     )
     {
-        var details = new Dictionary<string, object?>();
+        var details = new DetailCollection();
 
         foreach (var (source, level) in sources.Where(source => source is not null).Select((source, level) => (source!, level)))
         {

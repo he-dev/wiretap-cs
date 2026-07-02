@@ -44,45 +44,69 @@ public sealed class AnnotatedPropertiesTests
     public void CollectsAnnotatedDetails()
     {
         var source = new Source();
-        var details = new Dictionary<string, object?>();
-
-        GetAnnotatedDetails.From(
+        var details = GetAnnotatedDetails.From(
             new PropertyName("wiretap"),
             [source]
-        ).ToList().ForEach(pair => details[pair.Key] = pair.Value);
+        );
 
-        Assert.Equal("interface", details["wiretap.activity.state.by_interface"]);
-        Assert.Equal("visible", details["wiretap.activity.state.custom"]);
-        Assert.Equal("root", details["wiretap.activity.state.cascading"]);
+        Assert.Equal("interface", details.GetValueOrDefault("wiretap.activity.state.by_interface"));
+        Assert.Equal("visible", details.GetValueOrDefault("wiretap.activity.state.custom"));
+        Assert.Equal("root", details.GetValueOrDefault("wiretap.activity.state.cascading"));
         Assert.True(details.ContainsKey("wiretap.activity.state.optional"));
-        Assert.Null(details["wiretap.activity.state.optional"]);
+        Assert.Null(details.GetValueOrDefault("wiretap.activity.state.optional"));
     }
 
     [Fact]
     public void CollectsOnlyCascadingDetailsWhenRequested()
     {
         var source = new Source();
-        var details = new Dictionary<string, object?>();
-
-        GetAnnotatedDetails.From(
+        var details = GetAnnotatedDetails.From(
             new PropertyName("wiretap"),
             [new object(), source]
-        ).ToList().ForEach(pair => details[pair.Key] = pair.Value);
+        );
 
-        Assert.Equal(["wiretap.activity.state.cascading"], details.Keys);
+        Assert.Equal(["wiretap.activity.state.cascading"], details.Select(pair => pair.Key));
     }
 
     [Fact]
     public void CollectsAnnotatedRemarks()
     {
         var source = new Source();
-        var parts = GetAnnotatedRemarks.From(new PropertyName("wiretap"), new Dictionary<string, object?>(), source);
+        var parts = GetAnnotatedRemarks.From(new PropertyName("wiretap"), new DetailCollection(), source);
 
         var messages = parts.Select(x => x.Value).ToList();
         Assert.Equal("Interface: {wiretap.activity.state.by_interface_remark}", messages[0].Template);
         Assert.Equal(["interface"], messages[0].Args);
         Assert.Equal("Remark: '{wiretap.activity.state.RemarkedValue}'", messages[1].Template);
         Assert.Equal(["quoted"], messages[1].Args);
+    }
+
+    [Fact]
+    public void CollectDetailsUsesSourceBeforeAnnotations()
+    {
+        var source = new Source();
+        var details = new DetailCollection();
+        var builder = new DetailBuilder(new PropertyName("wiretap.activity.state"), 0, details);
+
+        CollectDetails.From(builder, source);
+
+        Assert.Equal("interface", details.GetValueOrDefault("wiretap.activity.state.by_interface"));
+        Assert.Equal("visible", details.GetValueOrDefault("wiretap.activity.state.custom"));
+    }
+
+    [Fact]
+    public void CollectRemarksUsesSourceBeforeAnnotations()
+    {
+        var source = new Source();
+        var details = new DetailCollection();
+        var remarks = new RemarkCollection();
+        var builder = new RemarkBuilder(new PropertyName("wiretap"), details, remarks);
+
+        CollectRemarks.From(builder, source);
+
+        var messages = remarks.Select(x => x.Value).ToList();
+        Assert.Equal("Interface: {wiretap.activity.state.by_interface_remark}", messages[0].Template);
+        Assert.Equal("Remark: '{wiretap.activity.state.RemarkedValue}'", messages[1].Template);
     }
 
     private sealed class Source : IDetailSource, IRemarkSource

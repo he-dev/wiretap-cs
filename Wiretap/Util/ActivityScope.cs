@@ -1,5 +1,6 @@
 using System.Collections;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 
@@ -26,6 +27,56 @@ public abstract class ActivityScope(Activity activity) : ILogPropertySource, IDi
     public string ActivityName => Activity.Name;
 
     public static ActivityScope? Current => AmbientContext<ActivityScope>.Current;
+
+    protected void Log()
+    {
+        // TODO: Replace the dummy logger when ActivityLogger is passed into ActivityScope.
+        var logger = new ActivityLogger(NullLogger.Instance);
+        var recipe = Variant.CreateLogEntryBy;
+        var root = recipe.Root;
+        var status = Activity.Status;
+        var activities = this.Select(scope => scope.Activity).ToList();
+
+        var details = new DetailCollection();
+        details.Put(root.Activity.Name, Activity.Name);
+        details.Put(root.Activity.Status.Code, status.Code);
+        details.Put(root.Activity.Status.Role, status switch
+        {
+            ActivityStatusRole.IFirst => "first",
+            ActivityStatusRole.ILast => "last",
+            _ => null
+        });
+        details.Put(root.Activity.Role, Activity.Role);
+        details.Put(root.Activity.Depth, activities.Count - 1);
+        details.Put(root.Activity.Path, string.Join("/", activities.AsEnumerable().Reverse().Select(activity => activity.Name)));
+        details.Put(root.Activity.Tags, Activity.Tags.Length > 0 ? Activity.Tags : null);
+        details.Put(root.Activity.DurationMs, Activity is Activity.Buzz buzz ? buzz.DurationMs : null);
+
+        TraceHandle.LogProperties(root, (name, value) => details.Put(name, value));
+
+        foreach (var (source, level) in activities.Select((source, level) => (source, level)))
+        {
+            var builder = new DetailBuilder(root.Activity.State, level, details);
+            CollectDetails.From(builder, source);
+        }
+
+        var remarks = new RemarkCollection();
+        foreach (var source in new object[] { Activity, status })
+        {
+            var builder = new RemarkBuilder(root, details, remarks);
+            CollectRemarks.From(builder, source);
+        }
+
+        var message = ComposeMessage2.Default.From(root, details, remarks);
+        logger.Log(
+            status.Level,
+            details
+                .Where(pair => pair.Value is not null)
+                .ToDictionary(pair => pair.Key, pair => pair.Value),
+            message,
+            status.Exception
+        );
+    }
 
     public virtual void LogProperties(PropertyName name, PushLogProperty push)
     {

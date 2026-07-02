@@ -1,4 +1,4 @@
-using Wiretap.Util.Buzz;
+using JetBrains.Annotations;
 
 namespace Wiretap.Util;
 
@@ -20,31 +20,55 @@ public interface IRemarkSource
     void Remarks(RemarkBuilder remarks);
 }
 
-public sealed class RemarkBuilder(
-    PropertyName root,
-    IReadOnlyDictionary<string, object?> details,
-    MessagePartMap remarks
-)
+public sealed class RemarkBuilder(PropertyName root, DetailCollection details, RemarkCollection remarks)
 {
+    public PropertyName Root { get; } = root;
+
+    public DetailCollection Details { get; } = details;
+
     public void Add(PropertyName name, object? value, Action<RemarkOptions>? configure = null)
     {
         var options = new RemarkOptions();
         configure?.Invoke(options);
 
-        var part = new PushMessagePart(_ => null, remarks).Discrete(root.Activity.State + name, value);
-        if (options.Label is { } label)
-        {
-            part.Label(label).Separator(options.Separator);
-        }
-        if (options.Format is { } format)
-        {
-            part.Format(format);
-        }
-        part.Quote(options.QuoteMode, options.QuoteStyle);
+        Add(Root.Activity.State + name, Render(Root.Activity.State + name, value, options), value);
     }
 
     public void Add(PropertyName name, Action<RemarkOptions>? configure = null)
     {
-        Add(name, details.GetValueOrDefault((root.Activity.State + name).ToString()), configure);
+        var key = Root.Activity.State + name;
+        Add(name, Details.GetValueOrDefault(key), configure);
+    }
+
+    public void Add(PropertyName name, [StructuredMessageTemplate] string? message, params object?[] args)
+    {
+        remarks.Put(name, new MessageTemplate(message, args));
+    }
+
+    private static string? Render(PropertyName name, object? value, RemarkOptions options)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var placeholder = options.Format is null ? $"{name:_}" : name.ToString(options.Format, null);
+        var quote = options.QuoteStyle switch
+        {
+            QuoteStyle.Double => '"',
+            QuoteStyle.Single => '\'',
+            _ => '"'
+        };
+        var shouldQuote = options.QuoteMode switch
+        {
+            QuoteMode.Never => false,
+            QuoteMode.Auto => value.ToString()?.Any(char.IsWhiteSpace) == true,
+            QuoteMode.Always => true,
+            _ => false
+        };
+
+        placeholder = shouldQuote ? $"{quote}{placeholder}{quote}" : placeholder;
+        var label = options.Label ?? name.Parts.LastOrDefault() ?? name.ToString();
+        return $"{label}{options.Separator}{placeholder}";
     }
 }

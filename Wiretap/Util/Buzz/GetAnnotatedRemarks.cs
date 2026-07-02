@@ -2,13 +2,13 @@ namespace Wiretap.Util.Buzz;
 
 public static class GetAnnotatedRemarks
 {
-    public static MessagePartMap From(
+    public static RemarkCollection From(
         PropertyName root,
-        IReadOnlyDictionary<string, object?> details,
+        DetailCollection details,
         params object?[] sources
     )
     {
-        var remarks = new MessagePartMap();
+        var remarks = new RemarkCollection();
 
         foreach (var source in sources)
         {

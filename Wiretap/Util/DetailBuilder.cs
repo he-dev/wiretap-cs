@@ -13,7 +13,7 @@ public interface IDetailSource
 public sealed class DetailBuilder(
     PropertyName root,
     int level,
-    IDictionary<string, object?> details
+    DetailCollection details
 )
 {
     public void Add(PropertyName name, object? value, Action<DetailOptions>? configure = null)
@@ -26,13 +26,13 @@ public sealed class DetailBuilder(
             var key = (root + name).ToString();
             if (!details.TryGetValue(key, out var current))
             {
-                details[key] = value;
+                details.Put(key, value);
             }
             else
             {
                 if (current is null && value is not null)
                 {
-                    details[key] = value;
+                    details.Put(key, value);
                 }
             }
         }
