@@ -7,9 +7,7 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Wiretap.Api.Util;
 using Wiretap.Core;
-using Wiretap.Meta;
 using Wiretap.Util;
-using Wiretap.Util.Buzz;
 
 if (args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase))
 {
@@ -44,8 +42,12 @@ using (var scope = app.Services.CreateScope())
     var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase) ? 10_000 : 1;
 
-    Wiretap.Util.Configuration.UseDiagnosticsLogger(loggerFactory);
-    using var _ = Wiretap.Util.Configuration.TraceContext.Listen();
+    Configuration.Default = new Configuration
+    {
+        DiagnosticLogger = DiagnosticLogger.Create(loggerFactory)
+    };
+
+    using var _ = Wiretap.Util.Configuration.Default.TraceContext.Listen();
     using (var bulk = logger.BeginBulk(new Wires.DeleteFolder { Path = "batch" }))
     {
         for (var i = 0; i < loopCount; i++)

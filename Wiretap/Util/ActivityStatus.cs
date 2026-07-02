@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Wiretap.Util.Buzz;
+using Wiretap.Util.Data;
+
 namespace Wiretap.Util;
 
 // core: The generic parameter ensures statuses can only be used with their activity contract.

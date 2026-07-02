@@ -47,4 +47,8 @@ public sealed class DiagnosticLogger(ILogger logger) : ILogger
             }
         }
     }
+
+    public static DiagnosticLogger Create(ILoggerFactory loggerFactory) => new(loggerFactory.CreateLogger("Wiretap.Diagnostics"));
+
+    public static DiagnosticLogger Create(ILogger logger) => new(logger);
 }

@@ -16,7 +16,7 @@ public class SnapScope<TActivity>(ActivityLogger logger, TActivity activity) : A
     {
         if (!Activity.SetStatus(status))
         {
-            Util.Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
+            Util.Configuration.Default.DiagnosticLogger.WarnAboutLastStatusOverwrite(
                 Activity.Name,
                 Activity.Status.Code,
                 status.Code

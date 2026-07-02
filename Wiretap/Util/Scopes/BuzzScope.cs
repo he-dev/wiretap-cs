@@ -17,14 +17,14 @@ public class BuzzScope<TActivity>
 
     public void SetStatus(ActivityStatus<TActivity> status)
     {
-        Util.Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+        Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
             $"{ActivityName}.{status.GetType().Name}",
             $"{ActivityName}.{status.Code}"
         );
 
         if (!Activity.SetStatus(status))
         {
-            Util.Configuration.DiagnosticLogger.WarnAboutLastStatusOverwrite(
+            Util.Configuration.Default.DiagnosticLogger.WarnAboutLastStatusOverwrite(
                 Activity.Name,
                 Activity.Status.Code,
                 status.Code

@@ -1,4 +1,5 @@
 using Wiretap.Util.Buzz;
+using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
@@ -30,7 +31,7 @@ public abstract class Activity
 
     internal bool SetStatus(ActivityStatus status)
     {
-        Util.Configuration.DiagnosticLogger.WarnAboutCustomStatusName(
+        Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
             $"{Name}.{status.GetType().Name}",
             $"{Name}.{status.Code}"
         );

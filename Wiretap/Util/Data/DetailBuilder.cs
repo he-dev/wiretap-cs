@@ -1,6 +1,4 @@
-using Wiretap.Util.Data;
-
-namespace Wiretap.Util;
+namespace Wiretap.Util.Data;
 
 public sealed class DetailOptions
 {

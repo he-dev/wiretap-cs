@@ -1,3 +1,5 @@
+using Wiretap.Util.Data;
+
 namespace Wiretap.Util.Buzz;
 
 public static class CollectRemarks

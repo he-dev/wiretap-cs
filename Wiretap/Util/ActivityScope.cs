@@ -9,7 +9,7 @@ public abstract class ActivityScope(ActivityLogger logger, Activity activity) : 
 {
     private AmbientContext<ActivityScope>? AmbientScope { get; set; }
 
-    protected ITraceHandle TraceHandle { get; } = Util.Configuration.TraceContext.Start(activity.Name);
+    protected ITraceHandle TraceHandle { get; } = Util.Configuration.Default.TraceContext.Start(activity.Name);
 
     protected Configuration Configuration { get; } = Util.Configuration.Resolve(activity);
 

@@ -43,10 +43,7 @@ public sealed class ConfigurationTests
 
     private sealed class ConfiguredActivity : Activity.Buzz;
 
-    private sealed class ConfiguredMessageParts : IJoinMessageParts
-    {
-        public MessageTemplate By(IReadOnlyList<MessageTemplate> entries) => new("configured");
-    }
+
 
     private sealed class CaptureLogger : ILogger<ConfiguredActivity>
     {
