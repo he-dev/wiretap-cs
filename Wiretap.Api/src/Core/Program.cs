@@ -1,19 +1,11 @@
 using System;
-using BenchmarkDotNet.Running;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using Wiretap.Api.Util;
 using Wiretap.Core;
 using Wiretap.Util;
-
-if (args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase))
-{
-    BenchmarkRunner.Run<Benchmarks>();
-    return;
-}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +32,7 @@ using (var scope = app.Services.CreateScope())
 {
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     var loggerFactory = scope.ServiceProvider.GetRequiredService<ILoggerFactory>();
-    var loopCount = args.Contains("--benchmark", StringComparer.OrdinalIgnoreCase) ? 10_000 : 1;
+    var loopCount = 1;
 
     Configuration.Default = new Configuration
     {

@@ -14,7 +14,7 @@ public static class CollectDetails
             detailSource.Details(builder);
         }
 
-        AnnotatedProperties.For<Detail>(
+        GetPropertiesByAttribute.Where<Detail>(
             source,
             (propertyName, detail, value) =>
             {

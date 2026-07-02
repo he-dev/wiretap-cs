@@ -4,14 +4,11 @@ using System.Reflection;
 
 namespace Wiretap.Util.Buzz;
 
-public static class AnnotatedProperties
+public static class GetPropertiesByAttribute
 {
     private static readonly ConcurrentDictionary<(Type Source, Type Annotation), Getter[]> Cache = new();
 
-    public static void For<TAnnotation>(
-        object source,
-        Action<string, TAnnotation, object?> report
-    ) where TAnnotation : Attribute
+    public static void Where<TAnnotation>(object source, Action<string, TAnnotation, object?> report) where TAnnotation : Attribute
     {
         var getters = Cache.GetOrAdd((source.GetType(), typeof(TAnnotation)), Discover<TAnnotation>);
 
@@ -21,8 +18,7 @@ public static class AnnotatedProperties
         }
     }
 
-    private static Getter[] Discover<TAnnotation>((Type Source, Type Annotation) key)
-        where TAnnotation : Attribute
+    private static Getter[] Discover<TAnnotation>((Type Source, Type Annotation) key) where TAnnotation : Attribute
     {
         // todo: Warn through the diagnostic logger when annotated non-public properties are ignored.
         const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance;

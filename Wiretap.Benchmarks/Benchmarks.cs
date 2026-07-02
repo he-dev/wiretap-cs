@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -9,35 +9,14 @@ using Serilog;
 using Wiretap.Core;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
-namespace Wiretap.Api.Util;
+namespace Wiretap.Benchmarks;
 
 [MemoryDiagnoser]
 public class Benchmarks
 {
     private ILoggerFactory _factory = null!;
-    private CountingLoggerProvider _provider = null!;
     private ILogger<Benchmarks> _logger = null!;
     private string _logFilePath = null!;
-
-    // [GlobalSetup]
-    // public void Setup()
-    // {
-    //     _provider = new CountingLoggerProvider();
-    //     _factory = LoggerFactory.Create(builder =>
-    //     {
-    //         builder.ClearProviders();
-    //         builder.SetMinimumLevel(LogLevel.Trace);
-    //         builder.AddProvider(_provider);
-    //     });
-    //
-    //     _logger = _factory.CreateLogger<Benchmarks>();
-    // }
-    //
-    // [GlobalCleanup]
-    // public void Cleanup()
-    // {
-    //     _factory.Dispose();
-    // }
 
     [GlobalSetup]
     public void Setup()

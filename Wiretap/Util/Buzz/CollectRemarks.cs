@@ -11,7 +11,7 @@ public static class CollectRemarks
             remarkSource.Remarks(builder);
         }
 
-        AnnotatedProperties.For<Remark>(
+        GetPropertiesByAttribute.Where<Remark>(
             source,
             (propertyName, remark, value) =>
             {

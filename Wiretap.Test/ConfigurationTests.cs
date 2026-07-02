@@ -11,7 +11,7 @@ public sealed class ConfigurationTests
     public void MissingNamedVariantWarnsAndFallsBackToDefault()
     {
         var logger = new CaptureLogger();
-        Configuration.LogDiagnosticsWith(logger);
+        Configuration.Default = new Configuration { DiagnosticLogger = DiagnosticLogger.Create(logger) };
 
         var resolved = Configuration.Resolve(new MissingVariantActivity());
 
@@ -23,8 +23,8 @@ public sealed class ConfigurationTests
     public void ScopeLogsWithResolvedEntryFactory()
     {
         var logger = new CaptureLogger();
-        var factory = CreateLogEntry.Default with { JoinMessageParts = new ConfiguredMessageParts() };
-        Configuration.SetDefault(() => new Configuration.Variant(factory));
+        var composeMessage = new ComposeMessage().Join(_ => new MessageTemplate("configured"));
+        Configuration.Default = new Configuration { ComposeMessage = composeMessage };
 
         try
         {
@@ -32,7 +32,7 @@ public sealed class ConfigurationTests
         }
         finally
         {
-            Configuration.SetDefault(() => new Configuration.Variant());
+            Configuration.Default = new Configuration();
         }
 
         Assert.Equal(["configured", "configured"], logger.Messages);
@@ -42,8 +42,6 @@ public sealed class ConfigurationTests
     private sealed class MissingVariantActivity : Activity.Snap;
 
     private sealed class ConfiguredActivity : Activity.Buzz;
-
-
 
     private sealed class CaptureLogger : ILogger<ConfiguredActivity>
     {
