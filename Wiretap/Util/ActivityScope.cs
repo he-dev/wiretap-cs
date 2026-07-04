@@ -87,6 +87,8 @@ public abstract class ActivityScope(ActivityLogger logger, Activity activity) : 
         TraceHandle.Dispose();
         AmbientScope?.Dispose();
         GC.SuppressFinalize(this);
+
+
     }
 
     // core: Scope traversal starts with the current scope and proceeds toward the root.

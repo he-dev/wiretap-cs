@@ -1,19 +1,15 @@
-using Microsoft.Extensions.Logging;
-
 namespace Wiretap.Util.Scopes;
 
-public delegate void OnLastStatus<TActivity>(ActivityStatus<TActivity> status, TimeSpan duration)
-    where TActivity : Activity.Buzz;
+public delegate void OnLastStatus(string code, TimeSpan duration);
 
-public class BuzzScope<TActivity>
-(
-    ActivityLogger logger,
-    TActivity activity,
-    OmitStatus omitStatus = OmitStatus.None,
-    OnLastStatus<TActivity>? onLastStatus = null
-) : ActivityScope<TActivity>(logger, activity) where TActivity : Activity.Buzz
+public class BuzzScope<TActivity>(ActivityLogger logger, TActivity activity)
+    : ActivityScope<TActivity>(logger, activity) where TActivity : Activity.Buzz
 {
     private bool _disposed;
+
+    public OmitStatus OmitStatus { get; init; } = OmitStatus.None;
+
+    public OnLastStatus OnLastStatus { get; init; } = (_, _) => { };
 
     public void SetStatus(ActivityStatus<TActivity> status)
     {
@@ -22,7 +18,14 @@ public class BuzzScope<TActivity>
             $"{ActivityName}.{status.Code}"
         );
 
-        if (!Activity.SetStatus(status))
+        if (Activity.SetStatus(status))
+        {
+            if (status is ActivityStatusRole.ILast)
+            {
+                OnLastStatus(Activity.Status.Code, Activity.Duration);
+            }
+        }
+        else
         {
             Util.Configuration.Default.DiagnosticLogger.WarnAboutLastStatusOverwrite(
                 Activity.Name,
@@ -34,11 +37,11 @@ public class BuzzScope<TActivity>
 
     internal override void Push()
     {
-        Activity.Start();
         base.Push();
+        Activity.Start();
         Activity.SetStatus(new ActivityStatus<TActivity>.Ready());
 
-        if (!omitStatus.HasFlag(OmitStatus.First))
+        if (!OmitStatus.HasFlag(OmitStatus.First))
         {
             LogStatus();
         }
@@ -65,12 +68,10 @@ public class BuzzScope<TActivity>
                 _ => null
             });
 
-            if (!omitStatus.HasFlag(OmitStatus.Last))
+            if (!OmitStatus.HasFlag(OmitStatus.Last))
             {
                 LogStatus();
             }
-
-            onLastStatus?.Invoke((ActivityStatus<TActivity>)Activity.Status, Activity.Duration);
         }
         finally
         {

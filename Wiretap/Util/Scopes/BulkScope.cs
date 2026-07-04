@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
 
 namespace Wiretap.Util.Scopes;
@@ -9,14 +8,13 @@ public sealed class BulkScope<TBulk, TItem>(ActivityLogger logger, TBulk activit
 {
     public ItemScope<TItem> BeginItem(TItem item)
     {
-        return new ItemScope<TItem>(logger, item, Activity.Math.Count, Activity.OmitStatus).Also(x => x.Push());
+        return new ItemScope<TItem>(logger, item)
+        {
+            OmitStatus =  Activity.OmitStatus,
+            OnLastStatus = Activity.Math.Count
+        }.Also(x => x.Push());
     }
 }
 
-public sealed class ItemScope<TActivity>
-(
-    ActivityLogger logger,
-    TActivity activity,
-    OnLastStatus<TActivity> onLast,
-    OmitStatus omitStatus
-) : BuzzScope<TActivity>(logger, activity, omitStatus, onLast) where TActivity : Activity.Item;
+public sealed class ItemScope<TActivity>(ActivityLogger logger, TActivity activity)
+    : BuzzScope<TActivity>(logger, activity) where TActivity : Activity.Item;

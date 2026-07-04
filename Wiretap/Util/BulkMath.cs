@@ -22,12 +22,12 @@ public sealed class BulkMath
 
     public double ThroughputMs => DurationMs > 0 ? ItemCount / (double)DurationMs : 0;
 
-    public void Count(ActivityStatus status, TimeSpan duration)
+    public void Count(string code, TimeSpan duration)
     {
         ItemCount++;
         var durationMs = (long)duration.TotalMilliseconds;
 
-        var code = status.Code.ToLower(CultureInfo.InvariantCulture);
+        code = code.ToLower(CultureInfo.InvariantCulture);
         _statusCounts[code] = _statusCounts.GetValueOrDefault(code) + 1;
 
         DurationMs += durationMs;

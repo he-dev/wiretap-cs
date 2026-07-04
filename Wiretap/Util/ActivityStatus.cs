@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Buzz;
 using Wiretap.Util.Data;
 
 namespace Wiretap.Util;

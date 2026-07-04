@@ -1,5 +1,4 @@
 ﻿using System.Diagnostics;
-using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 

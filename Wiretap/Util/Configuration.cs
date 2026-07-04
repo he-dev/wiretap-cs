@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging;
 using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
@@ -8,7 +7,7 @@ public class Configuration
 {
     public DiagnosticLogger DiagnosticLogger { get; init; } = DiagnosticLogger.Noop;
 
-    public PropertyName Root { get; init; } = new PropertyName("Wiretap");
+    public PropertyName Root { get; init; } = new PropertyName("wiretap");
 
     public ComposeMessage ComposeMessage { get; init; } = new ComposeMessage();
 

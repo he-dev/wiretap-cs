@@ -54,27 +54,30 @@ public sealed class ComposeMessage
 
 public static class ComposeMessage2Remarks
 {
-    public static void AddActivity(this RemarkBuilder remarks)
+    extension(RemarkBuilder remarks)
     {
-        var activity = remarks.Root.Activity;
-        remarks.Add(
-            activity.Name,
-            $"{activity.Name:.}[{activity.Status.Code:.}]",
-            remarks.Details.GetValueOrDefault(activity.Name),
-            remarks.Details.GetValueOrDefault(activity.Status.Code)
-        );
-    }
+        public void AddActivity()
+        {
+            var activity = remarks.Root.Activity;
+            remarks.Add(
+                activity.Name,
+                $"{activity.Name:.}[{activity.Status.Code:.}]",
+                remarks.Details.GetValueOrDefault(activity.Name),
+                remarks.Details.GetValueOrDefault(activity.Status.Code)
+            );
+        }
 
-    public static void AddActivityDuration(this RemarkBuilder remarks)
-    {
-        var duration = remarks.Root.Activity.DurationMs;
-        remarks.Add(
-            duration,
-            remarks.Details.GetValueOrDefault(remarks.Root.Activity.Role) is "snap"
-                ? "Duration: N/A"
-                : $"Duration: {duration:N0} ms",
-            remarks.Details.GetValueOrDefault(duration)
-        );
+        public void AddActivityDuration()
+        {
+            var duration = remarks.Root.Activity.DurationMs;
+            remarks.Add(
+                duration,
+                remarks.Details.GetValueOrDefault(remarks.Root.Activity.Role) is "snap"
+                    ? "Duration: N/A"
+                    : $"Duration: {duration:N0} ms",
+                remarks.Details.GetValueOrDefault(duration)
+            );
+        }
     }
 }
 
