@@ -45,7 +45,7 @@ public class Configuration
         Resolved.Clear();
     }
 
-    public static Configuration Resolve(Activity activity) => Resolved.GetOrAdd(activity.GetType(), Resolve);
+    public static Configuration Resolve(object activity) => Resolved.GetOrAdd(activity.GetType(), Resolve);
 
     private static Configuration Resolve(Type activityType)
     {

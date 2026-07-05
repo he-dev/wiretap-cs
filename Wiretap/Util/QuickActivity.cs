@@ -43,46 +43,6 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     }
 }
 
-public class QuickSnap(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Snap, IRemarkSource
-{
-    // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
-    public override string Name => name;
-
-    // core: Quick contracts carry their optional structured message as contract data.
-    public void Remarks(RemarkBuilder remarks)
-    {
-        remarks.Add(remarks.Root.Activity.Append("message"), message, args);
-    }
-
-    public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickSnap>.Okay, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-
-    public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickSnap>.Noop, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-
-    public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickSnap>.Fail, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-}
-
 public class QuickItem(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
     : Activity.Item, IRemarkSource
 {

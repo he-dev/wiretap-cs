@@ -2,6 +2,11 @@ using System.Collections;
 
 namespace Wiretap.Meta;
 
+public interface IAmbientItem<T> where T : class, IAmbientItem<T>
+{
+    T? Parent { get; set; }
+}
+
 internal sealed class AmbientContext<T> : IDisposable, IEnumerable<AmbientContext<T>> where T : class
 {
     private static readonly AsyncLocal<AmbientContext<T>?> CurrentScope = new();
@@ -18,7 +23,7 @@ internal sealed class AmbientContext<T> : IDisposable, IEnumerable<AmbientContex
 
     public AmbientContext<T>? Parent { get; }
 
-    public static T? Current => CurrentScope.Value?.Value;
+    public static AmbientContext<T>? Current => CurrentScope.Value;
 
     public static AmbientContext<T> Push(T value)
     {

@@ -3,85 +3,86 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-[Flags]
-public enum OmitStatus
+public interface IActivity : IDisposable
 {
-    None = 0x0,
-    First = 0x1,
-    Last = 0x2,
-    Both = First | Last,
+    string Name { get; }
+
+    IActivityStatus Status { get; }
 }
 
-public abstract class Activity
+public interface IActivityStatusObserver : IDisposable
 {
-    private ActivityStatus? _status;
+    void OnStatusChange(IActivity activity, TimeSpan duration);
+}
 
+public interface IObservableActivity
+{
+    void Subscribe(IActivityStatusObserver observer);
+}
+
+internal class ActivityStatusObserverNoop : IActivityStatusObserver
+{
+    public void OnStatusChange(IActivity activity, TimeSpan duration) { }
+    public void Dispose() { }
+}
+
+public abstract class Activity<TActivity> : IActivity, IObservableActivity where TActivity : Activity<TActivity>
+{
     protected Activity()
     {
         Name = GetActivityName.For(GetType());
     }
 
+    private System.Diagnostics.Stopwatch Stopwatch { get; } = new();
+
+    private IActivityStatusObserver StatusObserver { get; set; } = new ActivityStatusObserverNoop();
+
     public virtual string Name { get; }
 
     public virtual string[] Tags { get; init; } = [];
 
+    public TimeSpan Duration => Stopwatch.Elapsed;
+
     public abstract string Role { get; }
 
-    internal ActivityStatus Status => _status ?? throw new InvalidOperationException("The activity has not started.");
+    public IActivityStatus Status { get; private set; } = new ActivityStatus<TActivity>.Pending();
 
-    internal bool SetStatus(ActivityStatus status)
+    public void Subscribe(IActivityStatusObserver statusObserver) => StatusObserver = statusObserver;
+
+    public bool SetStatus(ActivityStatus<TActivity> status)
     {
-        Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
-            $"{Name}.{status.GetType().Name}",
-            $"{Name}.{status.Code}"
-        );
+        // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
+        //     $"{Name}.{status.GetType().Name}",
+        //     $"{Name}.{status.Code}"
+        // );
 
-        if (_status is ActivityStatusRole.ILast)
+        if (status is ActivityStatus<TActivity>.Ready)
+        {
+            Stopwatch.Start();
+        }
+
+        if (Status is ActivityStatusRole.ILast)
         {
             return false;
         }
 
-        _status = status;
-        if (status is ActivityStatusRole.ILast)
-        {
-            OnLastStatusChange();
-        }
-
+        Status = status;
+        StatusObserver.OnStatusChange(this, Stopwatch.Elapsed);
         return true;
     }
 
-    protected virtual void OnLastStatusChange() { }
-
-    public abstract class Buzz : Activity
+    public void Dispose()
     {
-        private readonly System.Diagnostics.Stopwatch _stopwatch = new();
-
-        public override string Role => "buzz";
-
-        public TimeSpan Duration { get; private set; }
-
-        public long DurationMs => (long)Duration.TotalMilliseconds;
-
-        internal void Start() => _stopwatch.Start();
-
-        protected override void OnLastStatusChange()
-        {
-            Duration = _stopwatch.Elapsed;
-        }
+        SetStatus(new ActivityStatus<TActivity>.Cold());
+        StatusObserver.Dispose();
     }
 
-    public abstract class Item : Buzz
-    {
-        public override string Role => "item";
-    }
 
     public abstract class Bulk : Buzz
     {
         internal BulkMath Math { get; } = new();
 
         public override string Role => "bulk";
-
-        public abstract OmitStatus OmitStatus { get; init; }
 
         [Detail("bulk.item_count")]
         [Remark("Item Count")]
@@ -96,15 +97,7 @@ public abstract class Activity
         public double ThroughputS => Math.ThroughputMs * 1000.0;
     }
 
-    public abstract class Bulk<TBulk, TItem>(OmitStatus omitStatus) : Bulk
+    public abstract class Bulk<TBulk, TItem> : Bulk
         where TBulk : Bulk<TBulk, TItem>
-        where TItem : Item
-    {
-        public override OmitStatus OmitStatus { get; init; } = omitStatus;
-    }
-
-    public abstract class Snap : Activity
-    {
-        public override string Role => "snap";
-    }
+        where TItem : Item;
 }

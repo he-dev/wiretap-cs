@@ -6,7 +6,7 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    public class ExecuteStep : Activity.Buzz
+    public class ExecuteStep : Activity<ExecuteStep>.Buzz
     {
         public class Now : ExecuteStep
         {
