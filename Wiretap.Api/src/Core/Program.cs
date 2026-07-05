@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Wires;
 using Wiretap.Core;
 using Wiretap.Util;
 
@@ -66,7 +67,7 @@ using (var scope = app.Services.CreateScope())
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 
-    using (var step = logger.BeginBuzz(new Wires.Workflow.ExecuteStep.Now { StepIndex = 2 }))
+    using (var step = logger.BeginBuzz(new Wires.Workflow.ExecuteStep { StepIndex = 2 }))
     {
         // work...
     }
@@ -89,10 +90,10 @@ using (var scope = app.Services.CreateScope())
         delete.SetStatus(new Wires.DeleteFile.Noop.NotFound());
     }
 
-    logger.LogSnap(
-        new QuickSnap("InspectCache", "Key: {CacheKey}", "users:active"),
-        new QuickSnap.Okay("Entries: {EntryCount}", 42)
-    );
+    // logger.LogSnap(
+    //     new QuickSnap("InspectCache", "Key: {CacheKey}", "users:active"),
+    //     new QuickSnap.Okay("Entries: {EntryCount}", 42)
+    // );
 
     using (var quick = logger.BeginBuzz(new QuickBuzz("WarmIndex", "Index: {IndexName}", "documents")))
     {
@@ -101,14 +102,14 @@ using (var scope = app.Services.CreateScope())
 
     using (var quickBulk = logger.BeginBulk(new QuickBulk("ImportRows", "Source: {Source}", "rows.csv")))
     {
-        using (var item = quickBulk.BeginItem(new QuickItem("ImportRow", "Row: {RowNumber}", 1)))
+        using (var item = quickBulk.BeginItem(new QuickBuzz("ImportRow", "Row: {RowNumber}", 1)))
         {
-            item.SetStatus(new QuickItem.Okay("Record: {RecordId}", "A-001"));
+            item.SetStatus(new QuickBuzz.Okay("Record: {RecordId}", "A-001"));
         }
 
-        using (var item = quickBulk.BeginItem(new QuickItem("ImportRow", "Row: {RowNumber}", 2)))
+        using (var item = quickBulk.BeginItem(new QuickBuzz("ImportRow", "Row: {RowNumber}", 2)))
         {
-            item.SetStatus(new QuickItem.Noop("Skipped duplicate record."));
+            item.SetStatus(new QuickBuzz.Noop("Skipped duplicate record."));
         }
 
         quickBulk.SetStatus(new QuickBulk.Okay("Imported quick rows."));

@@ -15,7 +15,7 @@ public static class LoggerExtensions
 
         }
 
-        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(TBulk activity)
+        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(Buzz<TBulk>.Bulk<TItem> activity)
             where TBulk : Buzz<TBulk>.Bulk<TItem>
             where TItem : Buzz<TItem>
         {

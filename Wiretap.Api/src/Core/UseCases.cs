@@ -6,21 +6,18 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    public class ExecuteStep : Buzz<ExecuteStep>.Buzz
+    public class ExecuteStep : Buzz<ExecuteStep>
     {
-        public class Now : ExecuteStep
+        [Detail]
+        public required int StepIndex { get; init; }
+
+        public sealed class Okay : BuzzStatus<ExecuteStep>.Okay
         {
             [Detail]
-            public required int StepIndex { get; init; }
-
-            public sealed class Okay : BuzzStatus<Now>.Okay
-            {
-                [Detail]
-                public required int ItemsProcessed { get; init; }
-            }
-
-            public sealed class Fail : BuzzStatus<Now>.Fail;
+            public required int ItemsProcessed { get; init; }
         }
+
+        public sealed class Fail : BuzzStatus<ExecuteStep>.Fail;
     }
 }
 
@@ -51,7 +48,7 @@ public class DeleteFile : Buzz<DeleteFile>
     public sealed class Fail : BuzzStatus<DeleteFile>.Fail;
 }
 
-public class DeleteFolder() : Buzz<>.Bulk<DeleteFolder, DeleteFile>(OmitStatus.Last)
+public class DeleteFolder : Buzz<DeleteFolder>.Bulk<DeleteFile>
 {
     [Remark]
     public required string Path { get; init; }
@@ -61,7 +58,7 @@ public class DeleteFolder() : Buzz<>.Bulk<DeleteFolder, DeleteFile>(OmitStatus.L
     public sealed class Fail : BuzzStatus<DeleteFolder>.Fail;
 }
 
-public class ValidateRecord : Buzz<>.Snap
+public class ValidateRecord : Buzz<ValidateRecord>
 {
     [Detail]
     public required string RecordId { get; init; }
@@ -73,7 +70,7 @@ public class ValidateRecord : Buzz<>.Snap
     public sealed class Fail : BuzzStatus<ValidateRecord>.Fail;
 }
 
-public class CopyFile : Buzz<>.Buzz, IDetailSource
+public class CopyFile : Buzz<CopyFile>, IDetailSource
 {
     [Detail]
     public required string Path { get; init; }

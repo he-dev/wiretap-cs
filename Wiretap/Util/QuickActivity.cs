@@ -45,7 +45,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
 
 
 public class QuickBulk(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Buzz<>.Bulk<QuickBulk, QuickItem>, IRemarkSource
+    : Buzz<QuickBulk>.Bulk<QuickBuzz>, IRemarkSource
 {
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;

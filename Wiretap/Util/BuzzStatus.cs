@@ -36,8 +36,6 @@ public abstract class ActivityStatus_
     public Exception? Exception { get; init; }
 
     public Func<LogStatusPolicy> CanLog = () => LogStatusPolicy.Auto;
-
-
 }
 
 // core: The generic parameter ensures statuses can only be used with their activity contract.
