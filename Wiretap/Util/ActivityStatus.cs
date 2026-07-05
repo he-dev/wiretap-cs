@@ -3,6 +3,24 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
+public enum CanLogStatus
+{
+    Auto,
+    Sure,
+    Nope
+}
+
+public abstract class ActivityStatus
+{
+    public abstract string Code { get; }
+
+    public abstract LogLevel Level { get; }
+
+    public Exception? Exception { get; init; }
+
+    public Func<CanLogStatus> CanLog = () => CanLogStatus.Auto;
+}
+
 // core: The generic parameter ensures statuses can only be used with their activity contract.
 // ReSharper disable once UnusedTypeParameter
 public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity : Activity
@@ -54,11 +72,3 @@ public abstract class ActivityStatus<TActivity> : ActivityStatus where TActivity
     }
 }
 
-public abstract class ActivityStatus
-{
-    public abstract string Code { get; }
-
-    public abstract LogLevel Level { get; }
-
-    public Exception? Exception { get; init; }
-}
