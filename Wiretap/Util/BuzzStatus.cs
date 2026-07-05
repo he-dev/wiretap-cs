@@ -18,26 +18,6 @@ public interface IActivityStatus
     Func<LogStatusPolicy> LogStatusPolicy { get; }
 }
 
-public abstract class ActivityStatus_
-{
-    protected ActivityStatus_()
-    {
-        // todo: fix this warning
-        // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
-        //     $"{Name}.{status.GetType().Name}",
-        //     $"{Name}.{status.Code}"
-        // );
-    }
-
-    public abstract string Code { get; }
-
-    public abstract LogLevel Level { get; }
-
-    public Exception? Exception { get; init; }
-
-    public Func<LogStatusPolicy> CanLog = () => LogStatusPolicy.Auto;
-}
-
 // core: The generic parameter ensures statuses can only be used with their activity contract.
 // ReSharper disable once UnusedTypeParameter
 public abstract class BuzzStatus<TActivity> : IActivityStatus where TActivity : Buzz<TActivity>

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Wiretap.Meta;
 using Wiretap.Util;
-using Wiretap.Util.Scopes;
 
 namespace Wiretap.Core;
 
@@ -9,24 +8,27 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public TBuzz BeginBuzz<TBuzz>(TBuzz activity) where TBuzz : Buzz<TBuzz>
+        public TBuzz BeginBuzz<TBuzz>(TBuzz buzz) where TBuzz : Buzz<TBuzz>
         {
-            return activity.Also(x => x.Subscribe(new BuzzScope<TBuzz>(ActivityLogger.From(logger), activity)));
-
+            return
+                buzz
+                    .Also(x => x.Subscribe(new ActivityLogger(logger)))
+                    .Also(x => x.SetStatus(new BuzzStatus<TBuzz>.Ready()));
         }
 
-        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(Buzz<TBulk>.Bulk<TItem> activity)
+        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(Buzz<TBulk>.Bulk<TItem> bulk)
             where TBulk : Buzz<TBulk>.Bulk<TItem>
             where TItem : Buzz<TItem>
         {
-            return activity.Also(x => x.Subscribe(new BulkScope<TBulk, TItem>(ActivityLogger.From(logger), activity)));
-            //return new BulkScope<TBulk, TItem>(ActivityLogger.From(logger), (TBulk)activity).Also(x => x.Push());
+            return
+                bulk
+                    .Also(x => x.Subscribe(new ActivityLogger(logger)))
+                    .Also(x => x.SetStatus(new BuzzStatus<TBulk>.Ready()));
         }
 
-        public void LogSnap<TActivity>(TActivity activity, BuzzStatus<TActivity> status) where TActivity : Buzz<TActivity>
+        public void LogSnap<TBuzz>(TBuzz buzz, BuzzStatus<TBuzz> status) where TBuzz : Buzz<TBuzz>
         {
             //SnapScope<TActivity>.Log(logger, activity, status);
         }
     }
-
 }

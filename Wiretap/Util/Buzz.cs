@@ -1,55 +1,71 @@
+using System.Collections;
+using Wiretap.Meta;
 using Wiretap.Util.Buzz;
 using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public interface IActivity : IDisposable
+public interface IBuzz : IDisposable, IEnumerable<IBuzz>
 {
     string Name { get; }
 
+    string[] Tags { get; }
+
+    string Path { get; }
+
     IActivityStatus Status { get; }
+
+    ITraceHandle TraceHandle { get; }
 }
 
-public interface IActivityStatusObserver : IDisposable
+public interface IStatusObserver
 {
-    void OnStatusChange(IActivity activity, TimeSpan duration);
+    void OnStatusChange(IBuzz buzz, TimeSpan duration);
 }
 
-public interface IObservableActivity
+public interface IObservableStatus
 {
-    void Subscribe(IActivityStatusObserver observer);
+    void Subscribe(IStatusObserver observer);
 }
 
-internal class ActivityStatusObserverNoop : IActivityStatusObserver
+internal class StatusObserverNoop : IStatusObserver
 {
-    public void OnStatusChange(IActivity activity, TimeSpan duration) { }
-    public void Dispose() { }
+    public void OnStatusChange(IBuzz buzz, TimeSpan duration) { }
 }
 
-public abstract class Buzz<TBuzz>
-    : IActivity, IObservableActivity
-    where TBuzz : Buzz<TBuzz>
+public abstract class Buzz<TBuzz> : IBuzz, IObservableStatus where TBuzz : Buzz<TBuzz>
 {
     protected Buzz()
     {
         Name = GetActivityName.For(GetType());
+        TraceHandle = Configuration.Default.TraceContext.Start(Name);
+        Pop = AmbientContext<Buzz<TBuzz>>.Push(this);
     }
+
+    private IDisposable Pop { get; }
 
     private System.Diagnostics.Stopwatch Stopwatch { get; } = new();
 
-    private IActivityStatusObserver StatusObserver { get; set; } = new ActivityStatusObserverNoop();
+    private IStatusObserver StatusObserver { get; set; } = new StatusObserverNoop();
 
-    public virtual string Name { get; }
+    public ITraceHandle TraceHandle { get; }
 
-    public virtual string[] Tags { get; init; } = [];
+    public string Name { get; }
 
-    public TimeSpan Duration => Stopwatch.Elapsed;
+    public virtual string[] Tags { get; } = [];
+
+    public TimeSpan Elapsed => Stopwatch.Elapsed;
+
+    public string Path => string.Join("/", this.Reverse().Select(x => x.Name));
 
     //public abstract string Role { get; }
 
     public IActivityStatus Status { get; private set; } = new BuzzStatus<TBuzz>.Pending();
 
-    public void Subscribe(IActivityStatusObserver statusObserver) => StatusObserver = statusObserver;
+    public void Subscribe(IStatusObserver statusObserver)
+    {
+        StatusObserver = statusObserver;
+    }
 
     public bool SetStatus(BuzzStatus<TBuzz> status)
     {
@@ -65,7 +81,15 @@ public abstract class Buzz<TBuzz>
 
         if (Status is ActivityStatusRole.ILast)
         {
-            return false;
+            switch (Status)
+            {
+                case BuzzStatus<TBuzz>.Okay:
+                    TraceHandle.Stop(ok: true);
+                    break;
+                case BuzzStatus<TBuzz>.Fail:
+                    TraceHandle.Stop(ok: false);
+                    break;
+            }
         }
 
         Status = status;
@@ -73,15 +97,30 @@ public abstract class Buzz<TBuzz>
         return true;
     }
 
+    public IEnumerator<IBuzz> GetEnumerator()
+    {
+        if (AmbientContext<Buzz<TBuzz>>.Current is IEnumerable<AmbientContext<Buzz<TBuzz>>> context)
+        {
+            foreach (var item in context)
+            {
+                yield return item.Value;
+            }
+        }
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
     public void Dispose()
     {
         SetStatus(new BuzzStatus<TBuzz>.Cold());
-        StatusObserver.Dispose();
+        TraceHandle.Dispose();
+        Pop.Dispose();
     }
 
-
-    public abstract class Bulk<TItem> : Buzz<TBuzz>
-        where TItem : Buzz<TItem>
+    public abstract class Bulk<TItem> : Buzz<TBuzz> where TItem : Buzz<TItem>
     {
         internal BulkMath Math { get; } = new();
 

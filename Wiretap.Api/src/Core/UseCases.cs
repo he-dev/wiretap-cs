@@ -8,6 +8,8 @@ public abstract class Workflow
 {
     public class ExecuteStep : Buzz<ExecuteStep>
     {
+        public class Now : ExecuteStep { }
+
         [Detail]
         public required int StepIndex { get; init; }
 
@@ -23,7 +25,7 @@ public abstract class Workflow
 
 public class DeleteFile : Buzz<DeleteFile>
 {
-    public override string[] Tags { get; init; } = ["io"];
+    public override string[] Tags { get; } = ["io"];
 
     [Remark]
     public required string Path { get; init; }
