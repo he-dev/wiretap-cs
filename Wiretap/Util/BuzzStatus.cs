@@ -42,7 +42,7 @@ public abstract class ActivityStatus_
 
 // core: The generic parameter ensures statuses can only be used with their activity contract.
 // ReSharper disable once UnusedTypeParameter
-public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivity : Activity<TActivity>
+public abstract class BuzzStatus<TActivity> : IActivityStatus where TActivity : Buzz<TActivity>
 {
     public abstract string Code { get; }
     public abstract LogLevel Level { get; }
@@ -50,21 +50,21 @@ public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivit
     public Func<LogStatusPolicy> LogStatusPolicy  { get; } = () => Util.LogStatusPolicy.Auto;
 
     // core: The first status emitted by a buzz when its scope is entered.
-    internal sealed class Pending : ActivityStatus<TActivity>, ActivityStatusRole.IFirst
+    internal sealed class Pending : BuzzStatus<TActivity>, ActivityStatusRole.IFirst
     {
         public override string Code => nameof(Pending);
 
         public override LogLevel Level => LogLevel.Information;
     }    // core: The first status emitted by a buzz when its scope is entered.
 
-    internal sealed class Ready : ActivityStatus<TActivity>, ActivityStatusRole.IFirst
+    internal sealed class Ready : BuzzStatus<TActivity>, ActivityStatusRole.IFirst
     {
         public override string Code => nameof(Ready);
 
         public override LogLevel Level => LogLevel.Information;
     }
 
-    internal sealed class Cold : ActivityStatus<TActivity>
+    internal sealed class Cold : BuzzStatus<TActivity>
     {
         public override string Code => nameof(Cold);
 
@@ -72,7 +72,7 @@ public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivit
     }
 
     // core: Everything went according to plan.
-    public abstract class Okay : ActivityStatus<TActivity>, ActivityStatusRole.ILast
+    public abstract class Okay : BuzzStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Okay);
 
@@ -80,7 +80,7 @@ public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivit
     }
 
     // core: The activity intentionally did nothing.
-    public abstract class Noop : ActivityStatus<TActivity>, ActivityStatusRole.ILast
+    public abstract class Noop : BuzzStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Noop);
 
@@ -88,7 +88,7 @@ public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivit
     }
 
     // core: An error occurred.
-    public abstract class Fail : ActivityStatus<TActivity>, ActivityStatusRole.ILast
+    public abstract class Fail : BuzzStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Fail);
 
@@ -99,7 +99,7 @@ public abstract class ActivityStatus<TActivity> : IActivityStatus where TActivit
     }
 
     // core: Framework fallback when a buzz exits without an explicit last status.
-    internal sealed class Void : ActivityStatus<TActivity>, ActivityStatusRole.ILast
+    internal sealed class Void : BuzzStatus<TActivity>, ActivityStatusRole.ILast
     {
         public override string Code => nameof(Void);
 

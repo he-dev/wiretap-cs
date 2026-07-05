@@ -4,7 +4,7 @@ using Wiretap.Util.Data;
 namespace Wiretap.Util;
 
 public class QuickBuzz(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Buzz, IRemarkSource
+    : Buzz<QuickBuzz>, IRemarkSource
 {
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;
@@ -16,7 +16,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBuzz>.Okay, IRemarkSource
+        : BuzzStatus<QuickBuzz>.Okay, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -25,7 +25,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBuzz>.Noop, IRemarkSource
+        : BuzzStatus<QuickBuzz>.Noop, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -34,7 +34,7 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBuzz>.Fail, IRemarkSource
+        : BuzzStatus<QuickBuzz>.Fail, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -43,52 +43,12 @@ public class QuickBuzz(string name, [StructuredMessageTemplate] string? message 
     }
 }
 
-public class QuickItem(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Item, IRemarkSource
-{
-    // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
-    public override string Name => name;
-
-    public void Remarks(RemarkBuilder remarks)
-    {
-        remarks.Add(remarks.Root.Activity.Append("message"), message, args);
-    }
-
-    public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickItem>.Okay, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-
-    public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickItem>.Noop, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-
-    public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickItem>.Fail, IRemarkSource
-    {
-        public void Remarks(RemarkBuilder remarks)
-        {
-            remarks.Add(remarks.Root.Activity.Status.Append("message"), message, args);
-        }
-    }
-}
 
 public class QuickBulk(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Activity.Bulk<QuickBulk, QuickItem>(OmitStatus.First), IRemarkSource
+    : Buzz<>.Bulk<QuickBulk, QuickItem>, IRemarkSource
 {
     // core: Quick activities are intentionally named at runtime instead of by their CLR contract type.
     public override string Name => name;
-
-    public override OmitStatus OmitStatus { get; init; } = OmitStatus.First;
 
     // core: Quick contracts carry their optional structured message as contract data.
     public void Remarks(RemarkBuilder remarks)
@@ -97,7 +57,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBulk>.Okay, IRemarkSource
+        : BuzzStatus<QuickBulk>.Okay, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -106,7 +66,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBulk>.Noop, IRemarkSource
+        : BuzzStatus<QuickBulk>.Noop, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -115,7 +75,7 @@ public class QuickBulk(string name, [StructuredMessageTemplate] string? message 
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : ActivityStatus<QuickBulk>.Fail, IRemarkSource
+        : BuzzStatus<QuickBulk>.Fail, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {

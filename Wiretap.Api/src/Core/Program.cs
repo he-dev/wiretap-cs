@@ -44,7 +44,7 @@ using (var scope = app.Services.CreateScope())
     {
         for (var i = 0; i < loopCount; i++)
         {
-            logger.LogSnap(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
+            //logger.LogSnap(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/a.txt" }))
             {

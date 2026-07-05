@@ -26,9 +26,11 @@ internal class ActivityStatusObserverNoop : IActivityStatusObserver
     public void Dispose() { }
 }
 
-public abstract class Activity<TActivity> : IActivity, IObservableActivity where TActivity : Activity<TActivity>
+public abstract class Buzz<TBuzz>
+    : IActivity, IObservableActivity
+    where TBuzz : Buzz<TBuzz>
 {
-    protected Activity()
+    protected Buzz()
     {
         Name = GetActivityName.For(GetType());
     }
@@ -43,20 +45,20 @@ public abstract class Activity<TActivity> : IActivity, IObservableActivity where
 
     public TimeSpan Duration => Stopwatch.Elapsed;
 
-    public abstract string Role { get; }
+    //public abstract string Role { get; }
 
-    public IActivityStatus Status { get; private set; } = new ActivityStatus<TActivity>.Pending();
+    public IActivityStatus Status { get; private set; } = new BuzzStatus<TBuzz>.Pending();
 
     public void Subscribe(IActivityStatusObserver statusObserver) => StatusObserver = statusObserver;
 
-    public bool SetStatus(ActivityStatus<TActivity> status)
+    public bool SetStatus(BuzzStatus<TBuzz> status)
     {
         // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
         //     $"{Name}.{status.GetType().Name}",
         //     $"{Name}.{status.Code}"
         // );
 
-        if (status is ActivityStatus<TActivity>.Ready)
+        if (status is BuzzStatus<TBuzz>.Ready)
         {
             Stopwatch.Start();
         }
@@ -73,16 +75,17 @@ public abstract class Activity<TActivity> : IActivity, IObservableActivity where
 
     public void Dispose()
     {
-        SetStatus(new ActivityStatus<TActivity>.Cold());
+        SetStatus(new BuzzStatus<TBuzz>.Cold());
         StatusObserver.Dispose();
     }
 
 
-    public abstract class Bulk : Buzz
+    public abstract class Bulk<TItem> : Buzz<TBuzz>
+        where TItem : Buzz<TItem>
     {
         internal BulkMath Math { get; } = new();
 
-        public override string Role => "bulk";
+        //public override string Role => "bulk";
 
         [Detail("bulk.item_count")]
         [Remark("Item Count")]
@@ -95,9 +98,11 @@ public abstract class Activity<TActivity> : IActivity, IObservableActivity where
         [Detail("bulk.throughput_s")]
         [Remark("Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
         public double ThroughputS => Math.ThroughputMs * 1000.0;
-    }
 
-    public abstract class Bulk<TBulk, TItem> : Bulk
-        where TBulk : Bulk<TBulk, TItem>
-        where TItem : Item;
+        public TItem BeginItem(TItem item)
+        {
+            // todo: wire the item status changes with the math.count
+            return item;
+        }
+    }
 }

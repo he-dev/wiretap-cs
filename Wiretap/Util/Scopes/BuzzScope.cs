@@ -5,14 +5,16 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public class BuzzScope<TActivity> : IEnumerable<BuzzScope<TActivity>>, IActivityStatusObserver where TActivity : Activity<TActivity>
+public class BuzzScope<TBuzz>
+    : IEnumerable<BuzzScope<TBuzz>>, IActivityStatusObserver
+    where TBuzz : Buzz<TBuzz>
 {
-    public BuzzScope(ActivityLogger logger, TActivity activity)
+    public BuzzScope(ActivityLogger logger, TBuzz activity)
     {
         Logger = logger;
         Activity = activity;
         Activity.Subscribe(this);
-        AmbientContext<BuzzScope<TActivity>>.Push(this);
+        AmbientContext<BuzzScope<TBuzz>>.Push(this);
         TraceHandle = Util.Configuration.Default.TraceContext.Start(Activity.Name);
         Configuration = Util.Configuration.Resolve(activity);
     }
@@ -20,7 +22,7 @@ public class BuzzScope<TActivity> : IEnumerable<BuzzScope<TActivity>>, IActivity
     private ActivityLogger Logger { get; }
     private ITraceHandle TraceHandle { get; }
     private Configuration Configuration { get; }
-    private TActivity Activity { get; }
+    private TBuzz Activity { get; }
     public string Path => string.Join("/", this.Reverse().Select(x => x.Activity.Name));
 
     public void OnStatusChange(IActivity activity, TimeSpan duration)
@@ -55,7 +57,7 @@ public class BuzzScope<TActivity> : IEnumerable<BuzzScope<TActivity>>, IActivity
             ActivityStatusRole.ILast => "last",
             _ => null
         });
-        details.Put(root.Activity.Role, Activity.Role);
+        //details.Put(root.Activity.Role, Activity.Role);
         details.Put(root.Activity.Depth, activities.Count - 1);
         details.Put(root.Activity.Path, string.Join("/", activities.AsEnumerable().Reverse().Select(activity => activity.Name)));
         details.Put(root.Activity.Tags, Activity.Tags.Length > 0 ? Activity.Tags : null);
@@ -98,9 +100,9 @@ public class BuzzScope<TActivity> : IEnumerable<BuzzScope<TActivity>>, IActivity
 
 
     // core: Scope traversal starts with the current scope and proceeds toward the root.
-    public IEnumerator<BuzzScope<TActivity>> GetEnumerator()
+    public IEnumerator<BuzzScope<TBuzz>> GetEnumerator()
     {
-        if (AmbientContext<BuzzScope<TActivity>>.Current is IEnumerable<AmbientContext<BuzzScope<TActivity>>> context)
+        if (AmbientContext<BuzzScope<TBuzz>>.Current is IEnumerable<AmbientContext<BuzzScope<TBuzz>>> context)
         {
             foreach (var item in context)
             {

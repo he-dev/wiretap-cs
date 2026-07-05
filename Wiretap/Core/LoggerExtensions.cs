@@ -9,20 +9,21 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public TActivity BeginBuzz<TActivity>(TActivity activity) where TActivity : Activity<TActivity>
+        public TBuzz BeginBuzz<TBuzz>(TBuzz activity) where TBuzz : Buzz<TBuzz>
         {
-            return activity.Also(x => x.Subscribe(new BuzzScope<TActivity>(ActivityLogger.From(logger), activity)));
+            return activity.Also(x => x.Subscribe(new BuzzScope<TBuzz>(ActivityLogger.From(logger), activity)));
 
         }
 
-        public BulkScope<TBulk, TItem> BeginBulk<TBulk, TItem>(Activity<TItem>.Bulk<TBulk, TItem> activity)
-            where TBulk : Activity<TItem>.Bulk<TBulk, TItem>
-            where TItem : Activity<TItem>.Item
+        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(TBulk activity)
+            where TBulk : Buzz<TBulk>.Bulk<TItem>
+            where TItem : Buzz<TItem>
         {
-            return new BulkScope<TBulk, TItem>(ActivityLogger.From(logger), (TBulk)activity).Also(x => x.Push());
+            return activity.Also(x => x.Subscribe(new BulkScope<TBulk, TItem>(ActivityLogger.From(logger), activity)));
+            //return new BulkScope<TBulk, TItem>(ActivityLogger.From(logger), (TBulk)activity).Also(x => x.Push());
         }
 
-        public void LogSnap<TActivity>(TActivity activity, ActivityStatus<TActivity> status) where TActivity : Activity<TActivity>
+        public void LogSnap<TActivity>(TActivity activity, BuzzStatus<TActivity> status) where TActivity : Buzz<TActivity>
         {
             //SnapScope<TActivity>.Log(logger, activity, status);
         }

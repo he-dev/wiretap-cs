@@ -39,9 +39,9 @@ public sealed class ConfigurationTests
     }
 
     [Configuration.Use("missing-variant")]
-    private sealed class MissingVariantActivity : Activity.Snap;
+    private sealed class MissingVariantActivity : Buzz<>.Snap;
 
-    private sealed class ConfiguredActivity : Activity.Buzz;
+    private sealed class ConfiguredActivity : Buzz<>.Buzz;
 
     private sealed class CaptureLogger : ILogger<ConfiguredActivity>
     {

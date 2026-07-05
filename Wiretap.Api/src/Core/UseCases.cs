@@ -6,32 +6,32 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    public class ExecuteStep : Activity<ExecuteStep>.Buzz
+    public class ExecuteStep : Buzz<ExecuteStep>.Buzz
     {
         public class Now : ExecuteStep
         {
             [Detail]
             public required int StepIndex { get; init; }
 
-            public sealed class Okay : ActivityStatus<Now>.Okay
+            public sealed class Okay : BuzzStatus<Now>.Okay
             {
                 [Detail]
                 public required int ItemsProcessed { get; init; }
             }
 
-            public sealed class Fail : ActivityStatus<Now>.Fail;
+            public sealed class Fail : BuzzStatus<Now>.Fail;
         }
     }
 }
 
-public class DeleteFile : Activity.Item
+public class DeleteFile : Buzz<DeleteFile>
 {
     public override string[] Tags { get; init; } = ["io"];
 
     [Remark]
     public required string Path { get; init; }
 
-    public class Noop : ActivityStatus<DeleteFile>.Noop, IRemarkSource
+    public class Noop : BuzzStatus<DeleteFile>.Noop, IRemarkSource
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
@@ -46,34 +46,34 @@ public class DeleteFile : Activity.Item
         }
     }
 
-    public sealed class Okay : ActivityStatus<DeleteFile>.Okay;
+    public sealed class Okay : BuzzStatus<DeleteFile>.Okay;
 
-    public sealed class Fail : ActivityStatus<DeleteFile>.Fail;
+    public sealed class Fail : BuzzStatus<DeleteFile>.Fail;
 }
 
-public class DeleteFolder() : Activity.Bulk<DeleteFolder, DeleteFile>(OmitStatus.Last)
+public class DeleteFolder() : Buzz<>.Bulk<DeleteFolder, DeleteFile>(OmitStatus.Last)
 {
     [Remark]
     public required string Path { get; init; }
 
-    public sealed class Okay : ActivityStatus<DeleteFolder>.Okay;
+    public sealed class Okay : BuzzStatus<DeleteFolder>.Okay;
 
-    public sealed class Fail : ActivityStatus<DeleteFolder>.Fail;
+    public sealed class Fail : BuzzStatus<DeleteFolder>.Fail;
 }
 
-public class ValidateRecord : Activity.Snap
+public class ValidateRecord : Buzz<>.Snap
 {
     [Detail]
     public required string RecordId { get; init; }
 
-    public sealed class Okay : ActivityStatus<ValidateRecord>.Okay;
+    public sealed class Okay : BuzzStatus<ValidateRecord>.Okay;
 
-    public sealed class Noop : ActivityStatus<ValidateRecord>.Noop;
+    public sealed class Noop : BuzzStatus<ValidateRecord>.Noop;
 
-    public sealed class Fail : ActivityStatus<ValidateRecord>.Fail;
+    public sealed class Fail : BuzzStatus<ValidateRecord>.Fail;
 }
 
-public class CopyFile : Activity.Buzz, IDetailSource
+public class CopyFile : Buzz<>.Buzz, IDetailSource
 {
     [Detail]
     public required string Path { get; init; }
