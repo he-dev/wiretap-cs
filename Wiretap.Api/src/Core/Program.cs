@@ -65,9 +65,10 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        bulk.SetStatus(new Wires.DeleteFile.Okay());
         // core: This should not work!
-        //bulk.SetStatus(new Wires.DeleteFolder.Okay());
+        //bulk.SetStatus(new Wires.DeleteFile.Okay());
+        bulk.SetStatus(new Wires.DeleteFolder.Okay());
+
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 
@@ -99,7 +100,7 @@ using (var scope = app.Services.CreateScope())
         quick.SetStatus(new Status.Okay());
     }
 
-    using (var quickBulk = logger.BeginBulk(new Buzz.Bulk<Buzz>("ImportRows")))
+    using (var quickBulk = logger.BeginBulk(new Buzz.Bulk("ImportRows")))
     {
         using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
         {

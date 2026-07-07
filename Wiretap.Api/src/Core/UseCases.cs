@@ -23,7 +23,7 @@ public abstract class Workflow
     }
 }
 
-public class DeleteFile : Buzz
+public class DeleteFile : Buzz, IAssociatedWith<DeleteFolder>
 {
     public override string[] Tags { get; } = ["io"];
 
@@ -50,7 +50,7 @@ public class DeleteFile : Buzz
     public sealed class Fail : Status.Fail, IAssociatedWith<DeleteFile>;
 }
 
-public class DeleteFolder : Buzz.Bulk<DeleteFile>
+public class DeleteFolder : Buzz.Bulk
 {
     [Remark]
     public required string Path { get; init; }

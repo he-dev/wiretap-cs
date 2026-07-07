@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Wiretap.Meta;
 using Wiretap.Util;
 
 namespace Wiretap.Core;
@@ -8,27 +7,28 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public BuzzContext<TBuzz> BeginBuzz<TBuzz>(TBuzz buzz) where TBuzz : Buzz
+        public BuzzContext<TBuzz> BeginBuzz<TBuzz>(TBuzz buzz)
+            where TBuzz : Buzz
         {
             buzz.Subscribe(new ActivityLogger(logger));
             buzz.SetStatus(new Status.Ready());
-            return new BuzzContext<TBuzz>(buzz);
+            return new(buzz);
         }
 
-        public BulkContext<TItem> BeginBulk<TItem>(Buzz.Bulk<TItem> bulk)
-            where TItem : Buzz
+        public BulkContext<TBulk> BeginBulk<TBulk>(TBulk bulk)
+            where TBulk : Buzz.Bulk
         {
             bulk.Subscribe(new ActivityLogger(logger));
             bulk.SetStatus(new Status.Ready());
-            return new BulkContext<TItem>(bulk);
+            return new(bulk);
         }
 
-        public void LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
+        public bool LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
             where TBuzz : Buzz
             where TStatus : Status, IAssociatedWith<TBuzz>
         {
             using var context = logger.BeginBuzz(buzz);
-            context.SetStatus(status);
+            return context.SetStatus(status);
         }
     }
 }

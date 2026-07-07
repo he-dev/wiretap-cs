@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Buzz;
 using Wiretap.Util.Buzz2;
 using Wiretap.Util.Data;
 
@@ -67,14 +66,14 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
         }
 
         var message = configuration.ComposeMessage.From(root, details, remarks);
-        Logger.Log(
-            status.Level,
-            details
-                .Where(pair => pair.Value is not null)
-                .ToDictionary(pair => pair.Key.ToString(), pair => pair.Value),
-            message,
-            status.Exception
-        );
+        // Logger.Log(
+        //     status.Level,
+        //     details
+        //         .Where(pair => pair.Value is not null)
+        //         .ToDictionary(pair => pair.Key.ToString(), pair => pair.Value),
+        //     message,
+        //     status.Exception
+        // );
     }
 
     public void Log(LogLevel level, IReadOnlyDictionary<string, object?> details, MessageTemplate message, Exception? exception = null)

@@ -13,10 +13,11 @@ public sealed class BuzzContext<TBuzz>(TBuzz buzz) : IDisposable where TBuzz : B
     public void Dispose() => buzz.Dispose();
 }
 
-public sealed class BulkContext<TItem>(Buzz.Bulk<TItem> bulk) : IDisposable
-    where TItem : Buzz
+public sealed class BulkContext<TBulk>(TBulk bulk) : IDisposable
+    where TBulk : Buzz.Bulk
 {
-    public BuzzContext<TItem> BeginItem(TItem item)
+    public BuzzContext<TItem> BeginItem<TItem>(TItem item)
+        where TItem : Buzz, IAssociatedWith<TBulk>
     {
         item.Subscribe(bulk);
         item.SetStatus(new Status.Ready());
@@ -24,7 +25,7 @@ public sealed class BulkContext<TItem>(Buzz.Bulk<TItem> bulk) : IDisposable
     }
 
     public bool SetStatus<TStatus>(TStatus status)
-        where TStatus : Status, IAssociatedWith<TItem>
+        where TStatus : Status, IAssociatedWith<TBulk>
     {
         return bulk.SetStatus(status);
     }

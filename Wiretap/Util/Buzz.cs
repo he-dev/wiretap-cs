@@ -20,7 +20,7 @@ internal class StatusObserverNoop : IStatusObserver
     public void OnStatusChange(Buzz buzz, TimeSpan duration) { }
 }
 
-public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable
+public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociatedWith<Buzz.Bulk>
 {
     public Buzz(string? name = null)
     {
@@ -37,7 +37,7 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable
 
     public ITraceHandle TraceHandle { get; }
 
-    public virtual string Name { get; init; }
+    public string Name { get; init; }
 
     public virtual string[] Tags { get; } = [];
 
@@ -107,11 +107,10 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable
         Pop.Dispose();
     }
 
-    public class Bulk<TItem>(string? name = null)
+    public class Bulk(string? name = null)
         : Buzz(name), IStatusObserver
-        where TItem : Buzz
     {
-        internal BulkMath Math { get; } = new();
+        private BulkMath Math { get; } = new();
 
         //public override string Role => "bulk";
 

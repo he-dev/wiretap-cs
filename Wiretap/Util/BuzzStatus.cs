@@ -29,13 +29,13 @@ public class Status
     internal sealed class Cold : Status;
 
     // core: Everything went according to plan.
-    public class Okay : Status, IAssociatedWith<Buzz>, ActivityStatusRole.ILast;
+    public class Okay : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast;
 
     // core: The activity intentionally did nothing.
-    public class Noop : Status, IAssociatedWith<Buzz>, ActivityStatusRole.ILast;
+    public class Noop : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast;
 
     // core: An error occurred.
-    public class Fail : Status, IAssociatedWith<Buzz>, ActivityStatusRole.ILast
+    public class Fail : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast
     {
         public override LogLevel Level => LogLevel.Error;
 
