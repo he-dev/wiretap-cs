@@ -97,22 +97,23 @@ using (var scope = app.Services.CreateScope())
 
     using (var quick = logger.BeginBuzz(new Buzz("WarmIndex")))
     {
-        quick.SetStatus(new Status.Okay());
+        quick.SetStatus(new Status.Last.Okay());
     }
 
     using (var quickBulk = logger.BeginBulk(new Buzz.Bulk("ImportRows")))
     {
-        using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
-        {
-            item.SetStatus(new Status.Okay());
-        }
+        // todo: this requires a new item-type
+        // using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
+        // {
+        //     item.SetStatus(new Status.Okay());
+        // }
+        //
+        // using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
+        // {
+        //     item.SetStatus(new Status.Noop());
+        // }
 
-        using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
-        {
-            item.SetStatus(new Status.Noop());
-        }
-
-        quickBulk.SetStatus(new Status.Okay());
+        quickBulk.SetStatus(new Status.Last.Okay());
     }
 }
 

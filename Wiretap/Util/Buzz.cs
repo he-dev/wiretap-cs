@@ -5,22 +5,25 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public interface IStatusObserver
+public interface IObserver
 {
-    void OnStatusChange(Buzz buzz, TimeSpan duration);
+    void OnBuzzChange(Buzz buzz);
 }
 
-public interface IObservableStatus
+public interface IObservable
 {
-    void Subscribe(IStatusObserver observer);
+    void Subscribe(IObserver observer);
 }
 
-internal class StatusObserverNoop : IStatusObserver
+internal static class Observer
 {
-    public void OnStatusChange(Buzz buzz, TimeSpan duration) { }
+    public class Noop : IObserver
+    {
+        public void OnBuzzChange(Buzz buzz) { }
+    }
 }
 
-public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociatedWith<Buzz.Bulk>
+public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 {
     public Buzz(string? name = null)
     {
@@ -33,7 +36,7 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociat
 
     private System.Diagnostics.Stopwatch Stopwatch { get; } = new();
 
-    private IStatusObserver StatusObserver { get; set; } = new StatusObserverNoop();
+    protected IObserver Subscriber { get; set; } = new Observer.Noop();
 
     public ITraceHandle TraceHandle { get; }
 
@@ -47,12 +50,11 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociat
 
     //public abstract string Role { get; }
 
-    public Status Status { get; private set; } = new Status.Pending();
+    public Status Status { get; private set; } = new Status.Idle.Pending();
 
-    public void Subscribe(IStatusObserver statusObserver)
-    {
-        StatusObserver = statusObserver;
-    }
+    public TimeSpan Duration { get; private set; } = TimeSpan.Zero;
+
+    public void Subscribe(IObserver observer) => Subscriber = observer;
 
     public bool SetStatus(Status status)
     {
@@ -61,26 +63,24 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociat
         //     $"{Name}.{status.Code}"
         // );
 
-        if (status is Status.Ready)
+        if (status is Status.First.Ready)
         {
             Stopwatch.Start();
         }
 
-        if (Status is ActivityStatusRole.ILast)
+        switch (Status)
         {
-            switch (Status)
-            {
-                case Status.Okay:
-                    TraceHandle.Stop(ok: true);
-                    break;
-                case Status.Fail:
-                    TraceHandle.Stop(ok: false);
-                    break;
-            }
+            case Status.Last.Okay:
+                TraceHandle.Stop(ok: true);
+                break;
+            case Status.Last.Fail:
+                TraceHandle.Stop(ok: false);
+                break;
         }
 
         Status = status;
-        StatusObserver.OnStatusChange(this, Stopwatch.Elapsed);
+        Duration = Stopwatch.Elapsed;
+        Subscriber.OnBuzzChange(this);
         return true;
     }
 
@@ -95,20 +95,17 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociat
         }
     }
 
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
     public void Dispose()
     {
-        SetStatus(new Status.Cold());
+        SetStatus(new Status.Idle.Cold());
         TraceHandle.Dispose();
         Pop.Dispose();
     }
 
-    public class Bulk(string? name = null)
-        : Buzz(name), IStatusObserver
+    public class Bulk(string? name = null, bool logItems = false)
+        : Buzz(name), IObserver
     {
         private BulkMath Math { get; } = new();
 
@@ -126,14 +123,17 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable, IAssociat
         [Remark("Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
         public double ThroughputS => Math.ThroughputMs * 1000.0;
 
-        public void OnStatusChange(Buzz item, TimeSpan duration)
+        public void OnBuzzChange(Buzz item)
         {
-            if (item.Status is ActivityStatusRole.ILast)
+            if (item.Status is Status.Last)
             {
-                Math.Count(item.Status.Code, duration);
+                Math.Count(item.Status.Code, item.Duration);
             }
 
-            // Later: publish selected item statuses if status.LogPolicy says Sure.
+            if (logItems)
+            {
+                Subscriber.OnBuzzChange(item);
+            }
         }
     }
 }

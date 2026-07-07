@@ -4,25 +4,17 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public sealed class ActivityLogger(ILogger logger) : IStatusObserver
+public sealed class ActivityLogger(ILogger logger) : IObserver
 {
-    public void OnStatusChange(Buzz buzz, TimeSpan duration)
+    public void OnBuzzChange(Buzz buzz)
     {
         var configuration = Util.Configuration.Resolve(buzz);
 
-        if (buzz.Status is ActivityStatusRole.ILast) { }
-
-        switch (buzz.Status.LogPolicy())
+        switch (buzz.Status)
         {
-            case LogStatusPolicy.Auto:
-                LogStatus(configuration, buzz, duration);
-                break;
-            case LogStatusPolicy.Sure:
-                LogStatus(configuration, buzz, duration);
-                break;
-            case LogStatusPolicy.Nope:
-                break;
-            default:
+            case Status.First:
+            case Status.Last:
+                LogStatus(configuration, buzz, buzz.Duration);
                 break;
         }
     }
@@ -38,8 +30,8 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
         details.Put(root.Activity.Status.Code, status.Code);
         details.Put(root.Activity.Status.Role, status switch
         {
-            ActivityStatusRole.IFirst => "first",
-            ActivityStatusRole.ILast => "last",
+            Status.First => "first",
+            Status.Last => "last",
             _ => null
         });
         //details.Put(root.Activity.Role, Activity.Role);
@@ -66,20 +58,19 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
         }
 
         var message = configuration.ComposeMessage.From(root, details, remarks);
-        // Logger.Log(
-        //     status.Level,
-        //     details
-        //         .Where(pair => pair.Value is not null)
-        //         .ToDictionary(pair => pair.Key.ToString(), pair => pair.Value),
-        //     message,
-        //     status.Exception
-        // );
+        Log(
+            status.Level,
+            details
+                .Where(pair => pair.Value is not null)
+                .ToDictionary(pair => pair.Key.ToString(), pair => pair.Value),
+            message,
+            status.Exception
+        );
     }
 
-    public void Log(LogLevel level, IReadOnlyDictionary<string, object?> details, MessageTemplate message, Exception? exception = null)
+    private void Log(LogLevel level, IReadOnlyDictionary<string, object?> details, MessageTemplate message, Exception? exception = null)
     {
         using var scope = details.Count == 0 ? null : logger.BeginScope(details);
         logger.Log(level, exception, message.Template, message.Args);
     }
-
 }

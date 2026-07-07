@@ -11,7 +11,7 @@ public static class LoggerExtensions
             where TBuzz : Buzz
         {
             buzz.Subscribe(new ActivityLogger(logger));
-            buzz.SetStatus(new Status.Ready());
+            buzz.SetStatus(new Status.First.Ready());
             return new(buzz);
         }
 
@@ -19,13 +19,13 @@ public static class LoggerExtensions
             where TBulk : Buzz.Bulk
         {
             bulk.Subscribe(new ActivityLogger(logger));
-            bulk.SetStatus(new Status.Ready());
+            bulk.SetStatus(new Status.First.Ready());
             return new(bulk);
         }
 
         public bool LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
             where TBuzz : Buzz
-            where TStatus : Status, IAssociatedWith<TBuzz>
+            where TStatus : Status, IStatusOf<TBuzz>
         {
             using var context = logger.BeginBuzz(buzz);
             return context.SetStatus(status);

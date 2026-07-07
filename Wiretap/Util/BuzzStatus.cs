@@ -3,52 +3,70 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public enum LogStatusPolicy
-{
-    Auto,
-    Sure,
-    Nope
-}
+public interface IStatusOf<TBuzz> where TBuzz : Buzz;
 
-public interface IAssociatedWith<T> where T : Buzz;
+public interface IItemOf<TBulk> where TBulk : Buzz.Bulk;
 
-public class Status
+public abstract class Status
 {
-    public virtual string Code => GetType().Name;
-    public virtual LogLevel Level => LogLevel.Information;
+    public abstract LogLevel Level { get; }
+    public string Code => GetType().Name;
     public Exception? Exception { get; init; }
-    public Func<LogStatusPolicy> LogPolicy { get; init; } = () => Util.LogStatusPolicy.Auto;
 
-    // core: The first status emitted by a buzz when its scope is entered.
-    internal sealed class Pending : Status, ActivityStatusRole.IFirst;
-
-    // core: Ready is framework-owned and starts timing/logging for an active buzz.
-    internal sealed class Ready : Status, ActivityStatusRole.IFirst;
-
-    // core: Cold marks a buzz that has left the active lifecycle.
-    internal sealed class Cold : Status;
-
-    // core: Everything went according to plan.
-    public class Okay : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast;
-
-    // core: The activity intentionally did nothing.
-    public class Noop : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast;
-
-    // core: An error occurred.
-    public class Fail : Status, IAssociatedWith<Buzz>, IAssociatedWith<Buzz.Bulk>, ActivityStatusRole.ILast
+    internal abstract class First : Status
     {
-        public override LogLevel Level => LogLevel.Error;
-
-        [Remark("Exception")]
-        public string? ExceptionMessage => Exception?.Message;
+        // core: Ready is framework-owned and starts timing/logging for an active buzz.
+        internal sealed class Ready : First
+        {
+            public override LogLevel Level => LogLevel.Information;
+        }
     }
 
-    // core: Framework fallback when a buzz exits without an explicit last status.
-    internal sealed class Void : Status, ActivityStatusRole.ILast
+    public abstract class Last : Status
     {
-        public override LogLevel Level => LogLevel.Warning;
+        // core: The activity intentionally did nothing.
+        public class Noop : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        {
+            public override LogLevel Level => LogLevel.Information;
+        }
 
-        [Remark]
-        public string Reason => "The buzz exited without an explicit last status.";
+        // core: Everything went according to plan.
+        public class Okay : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        {
+            public override LogLevel Level => LogLevel.Information;
+        }
+
+        // core: An error occurred.
+        public class Fail : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        {
+            public override LogLevel Level => LogLevel.Error;
+
+            [Remark("Exception")]
+            public string? ExceptionMessage => Exception?.Message;
+        }
+
+        // core: Framework fallback when a buzz exits without an explicit last status.
+        internal sealed class Void : Last
+        {
+            public override LogLevel Level => LogLevel.Warning;
+
+            [Remark]
+            public string Reason => "The buzz exited without an explicit last status.";
+        }
+    }
+
+    internal abstract class Idle : Status
+    {
+        // core: The first status emitted by a buzz when its scope is entered.
+        internal sealed class Pending : Idle
+        {
+            public override LogLevel Level => LogLevel.Debug;
+        }
+
+        // core: Cold marks a buzz that has left the active lifecycle.
+        internal sealed class Cold : Idle
+        {
+            public override LogLevel Level => LogLevel.Debug;
+        }
     }
 }
