@@ -45,11 +45,13 @@ using (var scope = app.Services.CreateScope())
     {
         for (var i = 0; i < loopCount; i++)
         {
-            //logger.LogSnap(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
+            //logger.LogStatus(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/a.txt" }))
             {
                 item.SetStatus(new Wires.DeleteFile.Okay());
+                // core: This should not work!
+                //item.SetStatus(new Wires.DeleteFolder.Okay());
             }
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/missing.txt" }))
@@ -63,7 +65,9 @@ using (var scope = app.Services.CreateScope())
             }
         }
 
-        bulk.SetStatus(new Wires.DeleteFolder.Okay());
+        bulk.SetStatus(new Wires.DeleteFile.Okay());
+        // core: This should not work!
+        //bulk.SetStatus(new Wires.DeleteFolder.Okay());
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 
@@ -90,29 +94,24 @@ using (var scope = app.Services.CreateScope())
         delete.SetStatus(new Wires.DeleteFile.Noop.NotFound());
     }
 
-    // logger.LogSnap(
-    //     new QuickSnap("InspectCache", "Key: {CacheKey}", "users:active"),
-    //     new QuickSnap.Okay("Entries: {EntryCount}", 42)
-    // );
-
-    using (var quick = logger.BeginBuzz(new QuickBuzz("WarmIndex", "Index: {IndexName}", "documents")))
+    using (var quick = logger.BeginBuzz(new Buzz("WarmIndex")))
     {
-        quick.SetStatus(new QuickBuzz.Okay("Segments: {SegmentCount}", 7));
+        quick.SetStatus(new Status.Okay());
     }
 
-    using (var quickBulk = logger.BeginBulk(new QuickBulk("ImportRows", "Source: {Source}", "rows.csv")))
+    using (var quickBulk = logger.BeginBulk(new Buzz.Bulk<Buzz>("ImportRows")))
     {
-        using (var item = quickBulk.BeginItem(new QuickBuzz("ImportRow", "Row: {RowNumber}", 1)))
+        using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
         {
-            item.SetStatus(new QuickBuzz.Okay("Record: {RecordId}", "A-001"));
+            item.SetStatus(new Status.Okay());
         }
 
-        using (var item = quickBulk.BeginItem(new QuickBuzz("ImportRow", "Row: {RowNumber}", 2)))
+        using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
         {
-            item.SetStatus(new QuickBuzz.Noop("Skipped duplicate record."));
+            item.SetStatus(new Status.Noop());
         }
 
-        quickBulk.SetStatus(new QuickBulk.Okay("Imported quick rows."));
+        quickBulk.SetStatus(new Status.Okay());
     }
 }
 

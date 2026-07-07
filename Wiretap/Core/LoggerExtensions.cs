@@ -8,27 +8,27 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public TBuzz BeginBuzz<TBuzz>(TBuzz buzz) where TBuzz : Buzz<TBuzz>
+        public BuzzContext<TBuzz> BeginBuzz<TBuzz>(TBuzz buzz) where TBuzz : Buzz
         {
-            return
-                buzz
-                    .Also(x => x.Subscribe(new ActivityLogger(logger)))
-                    .Also(x => x.SetStatus(new BuzzStatus<TBuzz>.Ready()));
+            buzz.Subscribe(new ActivityLogger(logger));
+            buzz.SetStatus(new Status.Ready());
+            return new BuzzContext<TBuzz>(buzz);
         }
 
-        public Buzz<TBulk>.Bulk<TItem> BeginBulk<TBulk, TItem>(Buzz<TBulk>.Bulk<TItem> bulk)
-            where TBulk : Buzz<TBulk>.Bulk<TItem>
-            where TItem : Buzz<TItem>
+        public BulkContext<TItem> BeginBulk<TItem>(Buzz.Bulk<TItem> bulk)
+            where TItem : Buzz
         {
-            return
-                bulk
-                    .Also(x => x.Subscribe(new ActivityLogger(logger)))
-                    .Also(x => x.SetStatus(new BuzzStatus<TBulk>.Ready()));
+            bulk.Subscribe(new ActivityLogger(logger));
+            bulk.SetStatus(new Status.Ready());
+            return new BulkContext<TItem>(bulk);
         }
 
-        public void LogSnap<TBuzz>(TBuzz buzz, BuzzStatus<TBuzz> status) where TBuzz : Buzz<TBuzz>
+        public void LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
+            where TBuzz : Buzz
+            where TStatus : Status, IAssociatedWith<TBuzz>
         {
-            //SnapScope<TActivity>.Log(logger, activity, status);
+            using var context = logger.BeginBuzz(buzz);
+            context.SetStatus(status);
         }
     }
 }

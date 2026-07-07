@@ -6,31 +6,31 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    public class ExecuteStep : Buzz<ExecuteStep>
+    public class ExecuteStep : Buzz
     {
         public class Now : ExecuteStep { }
 
         [Detail]
         public required int StepIndex { get; init; }
 
-        public sealed class Okay : BuzzStatus<ExecuteStep>.Okay
+        public sealed class Okay : Status.Okay, IAssociatedWith<ExecuteStep>
         {
             [Detail]
             public required int ItemsProcessed { get; init; }
         }
 
-        public sealed class Fail : BuzzStatus<ExecuteStep>.Fail;
+        public sealed class Fail : Status.Fail, IAssociatedWith<ExecuteStep>;
     }
 }
 
-public class DeleteFile : Buzz<DeleteFile>
+public class DeleteFile : Buzz
 {
     public override string[] Tags { get; } = ["io"];
 
     [Remark]
     public required string Path { get; init; }
 
-    public class Noop : BuzzStatus<DeleteFile>.Noop, IRemarkSource
+    public class Noop : Status.Noop, IAssociatedWith<DeleteFile>, IRemarkSource
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
@@ -45,34 +45,34 @@ public class DeleteFile : Buzz<DeleteFile>
         }
     }
 
-    public sealed class Okay : BuzzStatus<DeleteFile>.Okay;
+    public sealed class Okay : Status.Okay, IAssociatedWith<DeleteFile>;
 
-    public sealed class Fail : BuzzStatus<DeleteFile>.Fail;
+    public sealed class Fail : Status.Fail, IAssociatedWith<DeleteFile>;
 }
 
-public class DeleteFolder : Buzz<DeleteFolder>.Bulk<DeleteFile>
+public class DeleteFolder : Buzz.Bulk<DeleteFile>
 {
     [Remark]
     public required string Path { get; init; }
 
-    public sealed class Okay : BuzzStatus<DeleteFolder>.Okay;
+    public sealed class Okay : Status.Okay, IAssociatedWith<DeleteFolder>;
 
-    public sealed class Fail : BuzzStatus<DeleteFolder>.Fail;
+    public sealed class Fail : Status.Fail, IAssociatedWith<DeleteFolder>;
 }
 
-public class ValidateRecord : Buzz<ValidateRecord>
+public class ValidateRecord : Buzz
 {
     [Detail]
     public required string RecordId { get; init; }
 
-    public sealed class Okay : BuzzStatus<ValidateRecord>.Okay;
+    public sealed class Okay : Status.Okay, IAssociatedWith<ValidateRecord>;
 
-    public sealed class Noop : BuzzStatus<ValidateRecord>.Noop;
+    public sealed class Noop : Status.Noop, IAssociatedWith<ValidateRecord>;
 
-    public sealed class Fail : BuzzStatus<ValidateRecord>.Fail;
+    public sealed class Fail : Status.Fail, IAssociatedWith<ValidateRecord>;
 }
 
-public class CopyFile : Buzz<CopyFile>, IDetailSource
+public class CopyFile : Buzz, IDetailSource
 {
     [Detail]
     public required string Path { get; init; }

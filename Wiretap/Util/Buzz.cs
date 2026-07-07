@@ -1,5 +1,6 @@
 using System.Collections;
 using Wiretap.Meta;
+using Wiretap.Util.Buzz2;
 using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
@@ -19,11 +20,11 @@ internal class StatusObserverNoop : IStatusObserver
     public void OnStatusChange(Buzz buzz, TimeSpan duration) { }
 }
 
-public class Buzz : IEnumerable<Buzz>, IObservableStatus
+public class Buzz : IEnumerable<Buzz>, IObservableStatus, IDisposable
 {
-    protected Buzz()
+    public Buzz(string? name = null)
     {
-        Name = GetActivityName.For(GetType());
+        Name = name ?? GetActivityName.For(GetType());
         TraceHandle = Configuration.Default.TraceContext.Start(Name);
         Pop = AmbientContext<Buzz>.Push(this);
     }
@@ -36,7 +37,7 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
 
     public ITraceHandle TraceHandle { get; }
 
-    public string Name { get; }
+    public virtual string Name { get; init; }
 
     public virtual string[] Tags { get; } = [];
 
@@ -46,21 +47,21 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
 
     //public abstract string Role { get; }
 
-    public IActivityStatus Status { get; private set; } = new BuzzStatus<TBuzz>.Pending();
+    public Status Status { get; private set; } = new Status.Pending();
 
     public void Subscribe(IStatusObserver statusObserver)
     {
         StatusObserver = statusObserver;
     }
 
-    public bool SetStatus(BuzzStatus status)
+    public bool SetStatus(Status status)
     {
         // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
         //     $"{Name}.{status.GetType().Name}",
         //     $"{Name}.{status.Code}"
         // );
 
-        if (status is BuzzStatus<TBuzz>.Ready)
+        if (status is Status.Ready)
         {
             Stopwatch.Start();
         }
@@ -69,10 +70,10 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
         {
             switch (Status)
             {
-                case BuzzStatus<TBuzz>.Okay:
+                case Status.Okay:
                     TraceHandle.Stop(ok: true);
                     break;
-                case BuzzStatus<TBuzz>.Fail:
+                case Status.Fail:
                     TraceHandle.Stop(ok: false);
                     break;
             }
@@ -85,7 +86,7 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
 
     public IEnumerator<Buzz> GetEnumerator()
     {
-        if (AmbientContext<Buzz>.Current is IEnumerable < AmbientContext < Buzz > context)
+        if (AmbientContext<Buzz>.Current is IEnumerable<AmbientContext<Buzz>> context)
         {
             foreach (var item in context)
             {
@@ -101,12 +102,14 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
 
     public void Dispose()
     {
-        SetStatus(new BuzzStatus<Buzz>.Cold());
+        SetStatus(new Status.Cold());
         TraceHandle.Dispose();
         Pop.Dispose();
     }
 
-    public abstract class Bulk<TItem> : Buzz where TItem : Buzz
+    public class Bulk<TItem>(string? name = null)
+        : Buzz(name), IStatusObserver
+        where TItem : Buzz
     {
         internal BulkMath Math { get; } = new();
 
@@ -124,10 +127,14 @@ public class Buzz : IEnumerable<Buzz>, IObservableStatus
         [Remark("Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
         public double ThroughputS => Math.ThroughputMs * 1000.0;
 
-        public TItem BeginItem(TItem item)
+        public void OnStatusChange(Buzz item, TimeSpan duration)
         {
-            // todo: wire the item status changes with the math.count
-            return item;
+            if (item.Status is ActivityStatusRole.ILast)
+            {
+                Math.Count(item.Status.Code, duration);
+            }
+
+            // Later: publish selected item statuses if status.LogPolicy says Sure.
         }
     }
 }

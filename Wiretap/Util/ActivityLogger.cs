@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Wiretap.Util.Buzz;
+using Wiretap.Util.Buzz2;
 using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
@@ -12,11 +13,13 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
 
         if (buzz.Status is ActivityStatusRole.ILast) { }
 
-        switch (buzz.Status.LogStatusPolicy())
+        switch (buzz.Status.LogPolicy())
         {
             case LogStatusPolicy.Auto:
+                LogStatus(configuration, buzz, duration);
                 break;
             case LogStatusPolicy.Sure:
+                LogStatus(configuration, buzz, duration);
                 break;
             case LogStatusPolicy.Nope:
                 break;
@@ -25,9 +28,9 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
         }
     }
 
-    private void LogStatus(IBuzz buzz, TimeSpan duration)
+    private void LogStatus(Configuration configuration, Buzz buzz, TimeSpan duration)
     {
-        var root = Configuration.Root;
+        var root = configuration.Root;
         var status = buzz.Status;
 
 
@@ -63,7 +66,7 @@ public sealed class ActivityLogger(ILogger logger) : IStatusObserver
             CollectRemarks.From(builder, source);
         }
 
-        var message = Configuration.ComposeMessage.From(root, details, remarks);
+        var message = configuration.ComposeMessage.From(root, details, remarks);
         Logger.Log(
             status.Level,
             details
