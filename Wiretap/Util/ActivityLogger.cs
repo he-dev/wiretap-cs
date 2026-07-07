@@ -6,7 +6,7 @@ namespace Wiretap.Util;
 
 public sealed class ActivityLogger(ILogger logger) : IStatusObserver
 {
-    public void OnStatusChange(IBuzz buzz, TimeSpan duration)
+    public void OnStatusChange(Buzz buzz, TimeSpan duration)
     {
         var configuration = Util.Configuration.Resolve(buzz);
 

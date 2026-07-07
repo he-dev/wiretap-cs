@@ -1,26 +1,12 @@
 using System.Collections;
 using Wiretap.Meta;
-using Wiretap.Util.Buzz;
 using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public interface IBuzz : IDisposable, IEnumerable<IBuzz>
-{
-    string Name { get; }
-
-    string[] Tags { get; }
-
-    string Path { get; }
-
-    IActivityStatus Status { get; }
-
-    ITraceHandle TraceHandle { get; }
-}
-
 public interface IStatusObserver
 {
-    void OnStatusChange(IBuzz buzz, TimeSpan duration);
+    void OnStatusChange(Buzz buzz, TimeSpan duration);
 }
 
 public interface IObservableStatus
@@ -30,16 +16,16 @@ public interface IObservableStatus
 
 internal class StatusObserverNoop : IStatusObserver
 {
-    public void OnStatusChange(IBuzz buzz, TimeSpan duration) { }
+    public void OnStatusChange(Buzz buzz, TimeSpan duration) { }
 }
 
-public abstract class Buzz<TBuzz> : IBuzz, IObservableStatus where TBuzz : Buzz<TBuzz>
+public class Buzz : IEnumerable<Buzz>, IObservableStatus
 {
     protected Buzz()
     {
         Name = GetActivityName.For(GetType());
         TraceHandle = Configuration.Default.TraceContext.Start(Name);
-        Pop = AmbientContext<Buzz<TBuzz>>.Push(this);
+        Pop = AmbientContext<Buzz>.Push(this);
     }
 
     private IDisposable Pop { get; }
@@ -67,7 +53,7 @@ public abstract class Buzz<TBuzz> : IBuzz, IObservableStatus where TBuzz : Buzz<
         StatusObserver = statusObserver;
     }
 
-    public bool SetStatus(BuzzStatus<TBuzz> status)
+    public bool SetStatus(BuzzStatus status)
     {
         // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
         //     $"{Name}.{status.GetType().Name}",
@@ -97,9 +83,9 @@ public abstract class Buzz<TBuzz> : IBuzz, IObservableStatus where TBuzz : Buzz<
         return true;
     }
 
-    public IEnumerator<IBuzz> GetEnumerator()
+    public IEnumerator<Buzz> GetEnumerator()
     {
-        if (AmbientContext<Buzz<TBuzz>>.Current is IEnumerable<AmbientContext<Buzz<TBuzz>>> context)
+        if (AmbientContext<Buzz>.Current is IEnumerable < AmbientContext < Buzz > context)
         {
             foreach (var item in context)
             {
@@ -115,12 +101,12 @@ public abstract class Buzz<TBuzz> : IBuzz, IObservableStatus where TBuzz : Buzz<
 
     public void Dispose()
     {
-        SetStatus(new BuzzStatus<TBuzz>.Cold());
+        SetStatus(new BuzzStatus<Buzz>.Cold());
         TraceHandle.Dispose();
         Pop.Dispose();
     }
 
-    public abstract class Bulk<TItem> : Buzz<TBuzz> where TItem : Buzz<TItem>
+    public abstract class Bulk<TItem> : Buzz where TItem : Buzz
     {
         internal BulkMath Math { get; } = new();
 

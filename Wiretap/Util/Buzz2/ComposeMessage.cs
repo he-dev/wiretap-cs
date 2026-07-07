@@ -1,7 +1,7 @@
 using System.Text;
 using Wiretap.Util.Data;
 
-namespace Wiretap.Util.Buzz;
+namespace Wiretap.Util.Buzz2;
 
 public sealed class ComposeMessage
 {

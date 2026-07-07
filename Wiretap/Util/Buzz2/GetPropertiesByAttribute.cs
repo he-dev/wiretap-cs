@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace Wiretap.Util.Buzz;
+namespace Wiretap.Util.Buzz2;
 
 public static class GetPropertiesByAttribute
 {
