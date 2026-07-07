@@ -10,25 +10,25 @@ public static class LoggerExtensions
         public BuzzContext<TBuzz> BeginBuzz<TBuzz>(TBuzz buzz)
             where TBuzz : Buzz
         {
-            buzz.Subscribe(new ActivityLogger(logger));
-            buzz.SetStatus(new Status.First.Ready());
+            buzz.Subscribe(new BuzzLogger(logger));
+            buzz.SetStatus(new BuzzStatus.First.Ready());
             return new(buzz);
         }
 
         public BulkContext<TBulk> BeginBulk<TBulk>(TBulk bulk)
             where TBulk : Buzz.Bulk
         {
-            bulk.Subscribe(new ActivityLogger(logger));
-            bulk.SetStatus(new Status.First.Ready());
+            bulk.Subscribe(new BuzzLogger(logger));
+            bulk.SetStatus(new BuzzStatus.First.Ready());
             return new(bulk);
         }
 
-        public bool LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
+        public void LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
             where TBuzz : Buzz
-            where TStatus : Status, IStatusOf<TBuzz>
+            where TStatus : BuzzStatus, IStatusOf<TBuzz>
         {
             using var context = logger.BeginBuzz(buzz);
-            return context.SetStatus(status);
+            context.SetStatus(status);
         }
     }
 }

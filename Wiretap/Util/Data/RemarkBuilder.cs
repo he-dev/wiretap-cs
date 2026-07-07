@@ -31,12 +31,12 @@ public sealed class RemarkBuilder(PropertyName root, DetailCollection details, R
         var options = new RemarkOptions();
         configure?.Invoke(options);
 
-        Add(Root.Activity.State + name, Render(Root.Activity.State + name, value, options), value);
+        Add(Root.Buzz.State + name, Render(Root.Buzz.State + name, value, options), value);
     }
 
     public void Add(PropertyName name, Action<RemarkOptions>? configure = null)
     {
-        var key = Root.Activity.State + name;
+        var key = Root.Buzz.State + name;
         Add(name, Details.GetValueOrDefault(key), configure);
     }
 

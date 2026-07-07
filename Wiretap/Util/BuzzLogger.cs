@@ -4,49 +4,42 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public sealed class ActivityLogger(ILogger logger) : IObserver
+public sealed class BuzzLogger(ILogger logger) : IObserver
 {
     public void OnBuzzChange(Buzz buzz)
     {
-        var configuration = Util.Configuration.Resolve(buzz);
-
         switch (buzz.Status)
         {
-            case Status.First:
-            case Status.Last:
-                LogStatus(configuration, buzz, buzz.Duration);
+            case BuzzStatus.First:
+            case BuzzStatus.Last:
+                LogStatus(buzz);
                 break;
         }
     }
 
-    private void LogStatus(Configuration configuration, Buzz buzz, TimeSpan duration)
+    private void LogStatus(Buzz buzz)
     {
+        var configuration = Configuration.Resolve(buzz);
+
         var root = configuration.Root;
         var status = buzz.Status;
 
-
-        var details = new DetailCollection();
-        details.Put(root.Activity.Name, buzz.Name);
-        details.Put(root.Activity.Status.Code, status.Code);
-        details.Put(root.Activity.Status.Role, status switch
+        var details = new DetailCollection
         {
-            Status.First => "first",
-            Status.Last => "last",
-            _ => null
-        });
-        //details.Put(root.Activity.Role, Activity.Role);
-        details.Put(root.Activity.Depth, buzz.Count() - 1);
-        details.Put(root.Activity.Path, buzz.Path);
-        details.Put(root.Activity.Tags, buzz.Tags.Length > 0 ? buzz.Tags : null);
-        //details.Put(root.Activity.DurationMs, Activity is Activity.Buzz buzz ? buzz.DurationMs : null);
-
-        details.Put(root.TraceId, buzz.TraceHandle.TraceId);
-        details.Put(root.SpanId, buzz.TraceHandle.SpanId);
-        details.Put(root.ParentSpanId, buzz.TraceHandle.ParentSpanId);
+            { root.Buzz.Name, buzz.Name },
+            { root.Buzz.Status.Code, status.Code },
+            { root.Buzz.Status.Role, status.Role },
+            { root.Buzz.Depth, buzz.Count() - 1 },
+            { root.Buzz.Path, buzz.Path },
+            { root.Buzz.Tags, buzz.Tags.Length > 0 ? buzz.Tags : null },
+            { root.TraceId, buzz.TraceHandle.TraceId },
+            { root.SpanId, buzz.TraceHandle.SpanId },
+            { root.ParentSpanId, buzz.TraceHandle.ParentSpanId },
+        };
 
         foreach (var (source, level) in buzz.Select((source, level) => (source, level)))
         {
-            var builder = new DetailBuilder(root.Activity.State, level, details);
+            var builder = new DetailBuilder(root.Buzz.State, level, details);
             CollectDetails.From(builder, source);
         }
 

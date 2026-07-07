@@ -95,25 +95,24 @@ using (var scope = app.Services.CreateScope())
         delete.SetStatus(new Wires.DeleteFile.Noop.NotFound());
     }
 
-    using (var quick = logger.BeginBuzz(new Buzz("WarmIndex")))
+    using (var quick = logger.BeginBuzz(new BuzzLite("WarmIndex", "Index: {IndexName}", "documents")))
     {
-        quick.SetStatus(new Status.Last.Okay());
+        quick.SetStatus(new BuzzLite.Okay("Segments: {SegmentCount}", 7));
     }
 
-    using (var quickBulk = logger.BeginBulk(new Buzz.Bulk("ImportRows")))
+    using (var quickBulk = logger.BeginBulk(new BulkLite("ImportRows", "Source: {Source}", "rows.csv")))
     {
-        // todo: this requires a new item-type
-        // using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
-        // {
-        //     item.SetStatus(new Status.Okay());
-        // }
-        //
-        // using (var item = quickBulk.BeginItem(new Buzz("ImportRow")))
-        // {
-        //     item.SetStatus(new Status.Noop());
-        // }
+        using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 1)))
+        {
+            item.SetStatus(new BulkLiteItem.Okay("Record: {RecordId}", "A-001"));
+        }
 
-        quickBulk.SetStatus(new Status.Last.Okay());
+        using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 2)))
+        {
+            item.SetStatus(new BulkLiteItem.Noop("Skipped duplicate record."));
+        }
+
+        quickBulk.SetStatus(new BulkLite.Okay("Imported quick rows."));
     }
 }
 

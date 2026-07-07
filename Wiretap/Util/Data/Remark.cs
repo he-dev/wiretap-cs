@@ -1,9 +1,9 @@
 ﻿namespace Wiretap.Util.Data;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public class Remark(string? label = null) : Attribute
+public class Remark : Attribute
 {
-    public string? Label { get; } = label;
+    public string? Label { get; init; }
 
     public string? Separator { get; init; } = ": ";
 

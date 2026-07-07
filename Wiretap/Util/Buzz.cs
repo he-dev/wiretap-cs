@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics;
 using Wiretap.Meta;
 using Wiretap.Util.Buzz2;
 using Wiretap.Util.Data;
@@ -23,6 +24,11 @@ internal static class Observer
     }
 }
 
+public interface IBuzzMeta
+{
+    string Name { get; }
+}
+
 public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 {
     public Buzz(string? name = null)
@@ -34,13 +40,13 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 
     private IDisposable Pop { get; }
 
-    private System.Diagnostics.Stopwatch Stopwatch { get; } = new();
+    private Stopwatch Stopwatch { get; } = new();
 
     protected IObserver Subscriber { get; set; } = new Observer.Noop();
 
     public ITraceHandle TraceHandle { get; }
 
-    public string Name { get; init; }
+    public string Name { get; }
 
     public virtual string[] Tags { get; } = [];
 
@@ -48,32 +54,28 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 
     public string Path => string.Join("/", this.Reverse().Select(x => x.Name));
 
-    //public abstract string Role { get; }
-
-    public Status Status { get; private set; } = new Status.Idle.Pending();
+    public BuzzStatus Status { get; private set; } = new BuzzStatus.Idle.Pending();
 
     public TimeSpan Duration { get; private set; } = TimeSpan.Zero;
 
     public void Subscribe(IObserver observer) => Subscriber = observer;
 
-    public bool SetStatus(Status status)
+    public void SetStatus(BuzzStatus status)
     {
         // Util.Configuration.Default.DiagnosticLogger.WarnAboutCustomStatusName(
         //     $"{Name}.{status.GetType().Name}",
         //     $"{Name}.{status.Code}"
         // );
 
-        if (status is Status.First.Ready)
-        {
-            Stopwatch.Start();
-        }
-
         switch (Status)
         {
-            case Status.Last.Okay:
+            case BuzzStatus.First.Ready:
+                Stopwatch.Start();
+                break;
+            case BuzzStatus.Last.Okay:
                 TraceHandle.Stop(ok: true);
                 break;
-            case Status.Last.Fail:
+            case BuzzStatus.Last.Fail:
                 TraceHandle.Stop(ok: false);
                 break;
         }
@@ -81,7 +83,6 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
         Status = status;
         Duration = Stopwatch.Elapsed;
         Subscriber.OnBuzzChange(this);
-        return true;
     }
 
     public IEnumerator<Buzz> GetEnumerator()
@@ -99,7 +100,7 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 
     public void Dispose()
     {
-        SetStatus(new Status.Idle.Cold());
+        SetStatus(new BuzzStatus.Idle.Cold());
         TraceHandle.Dispose();
         Pop.Dispose();
     }
@@ -109,23 +110,21 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
     {
         private BulkMath Math { get; } = new();
 
-        //public override string Role => "bulk";
-
-        [Detail("bulk.item_count")]
-        [Remark("Item Count")]
+        [Detail(Name = "bulk.item_count")]
+        [Remark(Label = "Item Count")]
         public int ItemCount => Math.ItemCount;
 
-        [Detail("bulk.duration_s")]
-        [Remark("Item Duration", Format = "N3", QuoteMode = QuoteMode.Never)]
+        [Detail(Name = "bulk.duration_s")]
+        [Remark(Label = "Item Duration", Format = "N3", QuoteMode = QuoteMode.Never)]
         public double DurationS => Math.DurationMs / 1000.0;
 
-        [Detail("bulk.throughput_s")]
-        [Remark("Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
+        [Detail(Name = "bulk.throughput_s")]
+        [Remark(Label = "Throughput", Format = "N1", QuoteMode = QuoteMode.Never)]
         public double ThroughputS => Math.ThroughputMs * 1000.0;
 
         public void OnBuzzChange(Buzz item)
         {
-            if (item.Status is Status.Last)
+            if (item.Status is BuzzStatus.Last)
             {
                 Math.Count(item.Status.Code, item.Duration);
             }

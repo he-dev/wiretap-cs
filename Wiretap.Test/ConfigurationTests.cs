@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
 using Wiretap.Util;
-using Wiretap.Util.Buzz;
+using Wiretap.Util.Buzz2;
 
 namespace Wiretap.Test;
 
@@ -35,13 +35,13 @@ public sealed class ConfigurationTests
             Configuration.Default = new Configuration();
         }
 
-        Assert.Equal(["configured", "configured"], logger.Messages);
+        Assert.Equal(["configured"], logger.Messages);
     }
 
     [Configuration.Use("missing-variant")]
-    private sealed class MissingVariantActivity : Buzz<>.Snap;
+    private sealed class MissingVariantActivity : Buzz;
 
-    private sealed class ConfiguredActivity : Buzz<>.Buzz;
+    private sealed class ConfiguredActivity : Buzz;
 
     private sealed class CaptureLogger : ILogger<ConfiguredActivity>
     {

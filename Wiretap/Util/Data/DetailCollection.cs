@@ -9,6 +9,11 @@ public sealed class DetailCollection : IEnumerable<KeyValuePair<PropertyName, ob
         _details[name] = value;
     }
 
+    public void Add(PropertyName name, object? value)
+    {
+        Put(name, value);
+    }
+
     public object? GetValueOrDefault(PropertyName key)
     {
         return _details.GetValueOrDefault(key);

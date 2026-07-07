@@ -13,8 +13,8 @@ public sealed class ComposeMessage
 
     private Action<ArrangeRemarks> _arrange = arrange =>
     {
-        arrange.Add(arrange.Root.Activity.Name);
-        arrange.Add(arrange.Root.Activity.DurationMs);
+        arrange.Add(arrange.Root.Buzz.Name);
+        arrange.Add(arrange.Root.Buzz.DurationMs);
         arrange.AddRemaining();
     };
 
@@ -58,7 +58,7 @@ public static class ComposeMessage2Remarks
     {
         public void AddActivity()
         {
-            var activity = remarks.Root.Activity;
+            var activity = remarks.Root.Buzz;
             remarks.Add(
                 activity.Name,
                 $"{activity.Name:.}[{activity.Status.Code:.}]",
@@ -69,10 +69,10 @@ public static class ComposeMessage2Remarks
 
         public void AddActivityDuration()
         {
-            var duration = remarks.Root.Activity.DurationMs;
+            var duration = remarks.Root.Buzz.DurationMs;
             remarks.Add(
                 duration,
-                remarks.Details.GetValueOrDefault(remarks.Root.Activity.Role) is "snap"
+                remarks.Details.GetValueOrDefault(remarks.Root.Buzz.Role) is "snap"
                     ? "Duration: N/A"
                     : $"Duration: {duration:N0} ms",
                 remarks.Details.GetValueOrDefault(duration)

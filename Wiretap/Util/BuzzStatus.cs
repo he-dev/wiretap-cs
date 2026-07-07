@@ -7,41 +7,46 @@ public interface IStatusOf<TBuzz> where TBuzz : Buzz;
 
 public interface IItemOf<TBulk> where TBulk : Buzz.Bulk;
 
-public abstract class Status
+public abstract class BuzzStatus
 {
+    public abstract string Role { get; }
     public abstract LogLevel Level { get; }
     public string Code => GetType().Name;
     public Exception? Exception { get; init; }
 
-    internal abstract class First : Status
+    internal abstract class First : BuzzStatus
     {
         // core: Ready is framework-owned and starts timing/logging for an active buzz.
         internal sealed class Ready : First
         {
+            public override string Role => "first";
+
             public override LogLevel Level => LogLevel.Information;
         }
     }
 
-    public abstract class Last : Status
+    public abstract class Last : BuzzStatus
     {
+        public override string Role => "last";
+
         // core: The activity intentionally did nothing.
-        public class Noop : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        public class Noop : Last
         {
             public override LogLevel Level => LogLevel.Information;
         }
 
         // core: Everything went according to plan.
-        public class Okay : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        public class Okay : Last
         {
             public override LogLevel Level => LogLevel.Information;
         }
 
         // core: An error occurred.
-        public class Fail : Last, IStatusOf<Buzz>, IStatusOf<Buzz.Bulk>
+        public class Fail : Last
         {
             public override LogLevel Level => LogLevel.Error;
 
-            [Remark("Exception")]
+            [Remark(Label = "Exception")]
             public string? ExceptionMessage => Exception?.Message;
         }
 
@@ -55,8 +60,10 @@ public abstract class Status
         }
     }
 
-    internal abstract class Idle : Status
+    internal abstract class Idle : BuzzStatus
     {
+        public override string Role => "idle";
+
         // core: The first status emitted by a buzz when its scope is entered.
         internal sealed class Pending : Idle
         {

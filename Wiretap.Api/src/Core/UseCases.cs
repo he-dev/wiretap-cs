@@ -13,13 +13,13 @@ public abstract class Workflow
         [Detail]
         public required int StepIndex { get; init; }
 
-        public sealed class Okay : Status.Last.Okay, IStatusOf<ExecuteStep>
+        public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<ExecuteStep>
         {
             [Detail]
             public required int ItemsProcessed { get; init; }
         }
 
-        public sealed class Fail : Status.Last.Fail, IStatusOf<ExecuteStep>;
+        public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<ExecuteStep>;
     }
 }
 
@@ -30,7 +30,7 @@ public class DeleteFile : Buzz, IItemOf<DeleteFolder>
     [Remark]
     public required string Path { get; init; }
 
-    public class Noop : Status.Last.Noop, IStatusOf<DeleteFile>, IRemarkSource
+    public class Noop : BuzzStatus.Last.Noop, IStatusOf<DeleteFile>, IRemarkSource
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
@@ -45,9 +45,9 @@ public class DeleteFile : Buzz, IItemOf<DeleteFolder>
         }
     }
 
-    public sealed class Okay : Status.Last.Okay, IStatusOf<DeleteFile>;
+    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<DeleteFile>;
 
-    public sealed class Fail : Status.Last.Fail, IStatusOf<DeleteFile>;
+    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<DeleteFile>;
 }
 
 public class DeleteFolder : Buzz.Bulk
@@ -55,9 +55,9 @@ public class DeleteFolder : Buzz.Bulk
     [Remark]
     public required string Path { get; init; }
 
-    public sealed class Okay : Status.Last.Okay, IStatusOf<DeleteFolder>;
+    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<DeleteFolder>;
 
-    public sealed class Fail : Status.Last.Fail, IStatusOf<DeleteFolder>;
+    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<DeleteFolder>;
 }
 
 public class ValidateRecord : Buzz
@@ -65,11 +65,11 @@ public class ValidateRecord : Buzz
     [Detail]
     public required string RecordId { get; init; }
 
-    public sealed class Okay : Status.Last.Okay, IStatusOf<ValidateRecord>;
+    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<ValidateRecord>;
 
-    public sealed class Noop : Status.Last.Noop, IStatusOf<ValidateRecord>;
+    public sealed class Noop : BuzzStatus.Last.Noop, IStatusOf<ValidateRecord>;
 
-    public sealed class Fail : Status.Last.Fail, IStatusOf<ValidateRecord>;
+    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<ValidateRecord>;
 }
 
 public class CopyFile : Buzz, IDetailSource

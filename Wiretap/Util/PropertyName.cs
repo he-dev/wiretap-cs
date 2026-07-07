@@ -56,7 +56,7 @@ public static class PropertyNameExtensions
 {
     extension(PropertyName name)
     {
-        public PropertyName Activity => name.Append("activity");
+        public PropertyName Buzz => name.Append("buzz");
 
         public PropertyName State => name.Append("state");
 
