@@ -4,7 +4,7 @@ namespace Wiretap.Util;
 
 public sealed class BuzzContext<TBuzz>(TBuzz buzz) : IDisposable where TBuzz : Buzz
 {
-    public void SetStatus<TStatus>(TStatus status)
+    public void LogStatus<TStatus>(TStatus status)
         where TStatus : BuzzStatus, IStatusOf<TBuzz>
     {
         buzz.SetStatus(status);
@@ -24,7 +24,7 @@ public sealed class BulkContext<TBulk>(TBulk bulk) : IDisposable
         return new(item);
     }
 
-    public void SetStatus<TStatus>(TStatus status)
+    public void LogStatus<TStatus>(TStatus status)
         where TStatus : BuzzStatus, IStatusOf<TBulk>
     {
         bulk.SetStatus(status);

@@ -49,25 +49,25 @@ using (var scope = app.Services.CreateScope())
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/a.txt" }))
             {
-                item.SetStatus(new Wires.DeleteFile.Okay());
+                item.LogStatus(new Wires.DeleteFile.Okay());
                 // core: This should not work!
                 //item.SetStatus(new Wires.DeleteFolder.Okay());
             }
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/missing.txt" }))
             {
-                item.SetStatus(new Wires.DeleteFile.Noop.NotFound());
+                item.LogStatus(new Wires.DeleteFile.Noop.NotFound());
             }
 
             using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/error.txt" }))
             {
-                item.SetStatus(new Wires.DeleteFile.Fail());
+                item.LogStatus(new Wires.DeleteFile.Fail());
             }
         }
 
         // core: This should not work!
         //bulk.SetStatus(new Wires.DeleteFile.Okay());
-        bulk.SetStatus(new Wires.DeleteFolder.Okay());
+        bulk.LogStatus(new Wires.DeleteFolder.Okay());
 
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
@@ -88,31 +88,31 @@ using (var scope = app.Services.CreateScope())
 
     using (var delete = logger.BeginBuzz(new Wires.DeleteFile { Path = "test.txt" }))
     {
-        delete.SetStatus(new Wires.DeleteFile.Noop { Reason = "File not found." });
-        delete.SetStatus(new Wires.DeleteFile.Noop());
-        delete.SetStatus(new Wires.DeleteFile.Fail());
-        delete.SetStatus(new Wires.DeleteFile.Okay());
-        delete.SetStatus(new Wires.DeleteFile.Noop.NotFound());
+        delete.LogStatus(new Wires.DeleteFile.Noop { Reason = "File not found." });
+        delete.LogStatus(new Wires.DeleteFile.Noop());
+        delete.LogStatus(new Wires.DeleteFile.Fail());
+        delete.LogStatus(new Wires.DeleteFile.Okay());
+        delete.LogStatus(new Wires.DeleteFile.Noop.NotFound());
     }
 
     using (var quick = logger.BeginBuzz(new BuzzLite("WarmIndex", "Index: {IndexName}", "documents")))
     {
-        quick.SetStatus(new BuzzLite.Okay("Segments: {SegmentCount}", 7));
+        quick.LogStatus(new BuzzLite.Okay("Segments: {SegmentCount}", 7));
     }
 
     using (var quickBulk = logger.BeginBulk(new BulkLite("ImportRows", "Source: {Source}", "rows.csv")))
     {
         using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 1)))
         {
-            item.SetStatus(new BulkLiteItem.Okay("Record: {RecordId}", "A-001"));
+            item.LogStatus(new BulkLiteItem.Okay("Record: {RecordId}", "A-001"));
         }
 
         using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 2)))
         {
-            item.SetStatus(new BulkLiteItem.Noop("Skipped duplicate record."));
+            item.LogStatus(new BulkLiteItem.Noop("Skipped duplicate record."));
         }
 
-        quickBulk.SetStatus(new BulkLite.Okay("Imported quick rows."));
+        quickBulk.LogStatus(new BulkLite.Okay("Imported quick rows."));
     }
 }
 

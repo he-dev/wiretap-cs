@@ -24,14 +24,9 @@ internal static class Observer
     }
 }
 
-public interface IBuzzMeta
+public abstract class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 {
-    string Name { get; }
-}
-
-public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
-{
-    public Buzz(string? name = null)
+    protected Buzz(string? name = null)
     {
         Name = name ?? GetActivityName.For(GetType());
         TraceHandle = Configuration.Default.TraceContext.Start(Name);
@@ -42,19 +37,17 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
 
     private Stopwatch Stopwatch { get; } = new();
 
-    protected IObserver Subscriber { get; set; } = new Observer.Noop();
+    private IObserver Subscriber { get; set; } = new Observer.Noop();
+
+    private string Name { get; }
 
     public ITraceHandle TraceHandle { get; }
 
-    public string Name { get; }
-
     public virtual string[] Tags { get; } = [];
 
-    public TimeSpan Elapsed => Stopwatch.Elapsed;
-
-    public string Path => string.Join("/", this.Reverse().Select(x => x.Name));
-
     public BuzzStatus Status { get; private set; } = new BuzzStatus.Idle.Pending();
+
+    public TimeSpan Elapsed => Stopwatch.Elapsed;
 
     public TimeSpan Duration { get; private set; } = TimeSpan.Zero;
 
@@ -84,6 +77,8 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
         Duration = Stopwatch.Elapsed;
         Subscriber.OnBuzzChange(this);
     }
+
+    public override string ToString() => Name;
 
     public IEnumerator<Buzz> GetEnumerator()
     {
@@ -126,7 +121,7 @@ public class Buzz : IEnumerable<Buzz>, IObservable, IDisposable
         {
             if (item.Status is BuzzStatus.Last)
             {
-                Math.Count(item.Status.Code, item.Duration);
+                Math.Count(item.Status.ToString(), item.Duration);
             }
 
             if (logItems)

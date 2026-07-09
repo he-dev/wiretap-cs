@@ -26,11 +26,11 @@ public sealed class BuzzLogger(ILogger logger) : IObserver
 
         var details = new DetailCollection
         {
-            { root.Buzz.Name, buzz.Name },
-            { root.Buzz.Status.Code, status.Code },
+            { root.Buzz.Name, buzz.ToString() },
+            { root.Buzz.Status.Code, status.ToString() },
             { root.Buzz.Status.Role, status.Role },
             { root.Buzz.Depth, buzz.Count() - 1 },
-            { root.Buzz.Path, buzz.Path },
+            { root.Buzz.Path, string.Join("/", buzz.Reverse().Select(x => x.ToString())) },
             { root.Buzz.Tags, buzz.Tags.Length > 0 ? buzz.Tags : null },
             { root.TraceId, buzz.TraceHandle.TraceId },
             { root.SpanId, buzz.TraceHandle.SpanId },

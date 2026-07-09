@@ -28,7 +28,7 @@ public static class LoggerExtensions
             where TStatus : BuzzStatus, IStatusOf<TBuzz>
         {
             using var context = logger.BeginBuzz(buzz);
-            context.SetStatus(status);
+            context.LogStatus(status);
         }
     }
 }

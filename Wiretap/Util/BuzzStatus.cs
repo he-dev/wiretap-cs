@@ -9,10 +9,12 @@ public interface IItemOf<TBulk> where TBulk : Buzz.Bulk;
 
 public abstract class BuzzStatus
 {
+    private string Code => GetType().Name;
     public abstract string Role { get; }
     public abstract LogLevel Level { get; }
-    public string Code => GetType().Name;
     public Exception? Exception { get; init; }
+
+    public override string ToString() => Code;
 
     internal abstract class First : BuzzStatus
     {
