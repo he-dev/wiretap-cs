@@ -4,10 +4,7 @@ namespace Wiretap.Util.Buzz2;
 
 public static class CollectDetails
 {
-    public static void From(
-        DetailBuilder builder,
-        object source
-    )
+    public static void From(DetailBuilder builder, object source)
     {
         if (source is IDetailSource detailSource)
         {
@@ -16,10 +13,7 @@ public static class CollectDetails
 
         GetPropertiesByAttribute.Where<Detail>(
             source,
-            (propertyName, detail, value) =>
-            {
-                builder.Add(new PropertyName(detail.Name ?? propertyName), value, options => options.Cascade = detail.Cascade);
-            }
+            (propertyName, detail, value) => { builder.Add(new PropertyName(detail.Name ?? propertyName), value, options => options.Cascade = detail.Cascade); }
         );
     }
 }

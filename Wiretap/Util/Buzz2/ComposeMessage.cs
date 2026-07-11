@@ -52,7 +52,7 @@ public sealed class ComposeMessage
     }
 }
 
-public static class ComposeMessage2Remarks
+public static class ComposeMessageRemarks
 {
     extension(RemarkBuilder remarks)
     {

@@ -10,11 +10,7 @@ public interface IDetailSource
     void Details(DetailBuilder details);
 }
 
-public sealed class DetailBuilder(
-    PropertyName root,
-    int level,
-    DetailCollection details
-)
+public sealed class DetailBuilder(PropertyName root, int level, DetailCollection details)
 {
     public void Add(PropertyName name, object? value, Action<DetailOptions>? configure = null)
     {
