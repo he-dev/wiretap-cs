@@ -1,3 +1,4 @@
+using System;
 using Wiretap.Util;
 using Wiretap.Util.Data;
 
@@ -6,31 +7,31 @@ namespace Wires;
 
 public abstract class Workflow
 {
-    public class ExecuteStep : Buzz
+    public class ExecuteStep : Watch
     {
         public class Now : ExecuteStep { }
 
-        [Detail]
+        [StateItem]
         public required int StepIndex { get; init; }
 
-        public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<ExecuteStep>
+        public sealed class Okay : WatchEvent.Last.Okay, IEventOf<ExecuteStep>
         {
-            [Detail]
+            [StateItem]
             public required int ItemsProcessed { get; init; }
         }
 
-        public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<ExecuteStep>;
+        public sealed class Fail : WatchEvent.Last.Fail, IEventOf<ExecuteStep>;
     }
 }
 
-public class DeleteFile : Buzz, IItemOf<DeleteFolder>
+public class DeleteFile : Batch.Item, IItemOf<DeleteFolder>
 {
     public override string[] Tags { get; } = ["io"];
 
-    [Remark]
+    [MessagePart]
     public required string Path { get; init; }
 
-    public class Noop : BuzzStatus.Last.Noop, IStatusOf<DeleteFile>, IRemarkSource
+    public class Noop : WatchEvent.Last.Noop, IEventOf<DeleteFile>, IRemarkSource
     {
         public virtual string Reason { get; init; } = "Unspecified";
 
@@ -45,36 +46,36 @@ public class DeleteFile : Buzz, IItemOf<DeleteFolder>
         }
     }
 
-    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<DeleteFile>;
+    public sealed class Okay : WatchEvent.Last.Okay, IEventOf<DeleteFile>;
 
-    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<DeleteFile>;
+    public sealed class Fail : WatchEvent.Last.Fail, IEventOf<DeleteFile>;
 }
 
-public class DeleteFolder : Buzz.Bulk
+public class DeleteFolder : Batch
 {
-    [Remark]
+    [MessagePart]
     public required string Path { get; init; }
 
-    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<DeleteFolder>;
+    public sealed class Okay : WatchEvent.Last.Okay, IEventOf<DeleteFolder>;
 
-    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<DeleteFolder>;
+    public sealed class Fail : WatchEvent.Last.Fail, IEventOf<DeleteFolder>;
 }
 
-public class ValidateRecord : Buzz
+public class ValidateRecord : Watch
 {
-    [Detail]
+    [StateItem]
     public required string RecordId { get; init; }
 
-    public sealed class Okay : BuzzStatus.Last.Okay, IStatusOf<ValidateRecord>;
+    public sealed class Okay : WatchEvent.Last.Okay, IEventOf<ValidateRecord>;
 
-    public sealed class Noop : BuzzStatus.Last.Noop, IStatusOf<ValidateRecord>;
+    public sealed class Noop : WatchEvent.Last.Noop, IEventOf<ValidateRecord>;
 
-    public sealed class Fail : BuzzStatus.Last.Fail, IStatusOf<ValidateRecord>;
+    public sealed class Fail : WatchEvent.Last.Fail, IEventOf<ValidateRecord>;
 }
 
-public class CopyFile : Buzz, IDetailSource
+public class CopyFile : Watch, IDetailSource
 {
-    [Detail]
+    [StateItem]
     public required string Path { get; init; }
 
     public void Details(DetailBuilder details)

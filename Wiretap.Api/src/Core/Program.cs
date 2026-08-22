@@ -41,38 +41,38 @@ using (var scope = app.Services.CreateScope())
     };
 
     using var _ = Wiretap.Util.Configuration.Default.TraceContext.Listen();
-    using (var bulk = logger.BeginBulk(new Wires.DeleteFolder { Path = "batch" }))
+    using (var batch = logger.BeginBatch(new Wires.DeleteFolder { Path = "batch" }))
     {
         for (var i = 0; i < loopCount; i++)
         {
             //logger.LogStatus(new Wires.ValidateRecord { RecordId = "record-001" }, new Wires.ValidateRecord.Okay());
 
-            using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/a.txt" }))
+            using (var item = batch.BeginWatch(new Wires.DeleteFile { Path = "batch/a.txt" }))
             {
-                item.LogStatus(new Wires.DeleteFile.Okay());
+                item.LogEvent(new Wires.DeleteFile.Okay());
                 // core: This should not work!
-                //item.SetStatus(new Wires.DeleteFolder.Okay());
+                //item.LogEvent(new Wires.DeleteFolder.Okay());
             }
 
-            using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/missing.txt" }))
+            using (var item = batch.BeginWatch(new Wires.DeleteFile { Path = "batch/missing.txt" }))
             {
-                item.LogStatus(new Wires.DeleteFile.Noop.NotFound());
+                item.LogEvent(new Wires.DeleteFile.Noop.NotFound());
             }
 
-            using (var item = bulk.BeginItem(new Wires.DeleteFile { Path = "batch/error.txt" }))
+            using (var item = batch.BeginWatch(new Wires.DeleteFile { Path = "batch/error.txt" }))
             {
-                item.LogStatus(new Wires.DeleteFile.Fail());
+                item.LogEvent(new Wires.DeleteFile.Fail());
             }
         }
 
         // core: This should not work!
         //bulk.SetStatus(new Wires.DeleteFile.Okay());
-        bulk.LogStatus(new Wires.DeleteFolder.Okay());
+        batch.LogEvent(new Wires.DeleteFolder.Okay());
 
         //step.SetStatus(new Contracts.DeleteFile.Force.Ok("test.txt")); // note: Not assignable! Check!
     }
 
-    using (var step = logger.BeginBuzz(new Wires.Workflow.ExecuteStep { StepIndex = 2 }))
+    using (var step = logger.BeginWatch(new Wires.Workflow.ExecuteStep { StepIndex = 2 }))
     {
         // work...
     }
@@ -80,39 +80,39 @@ using (var scope = app.Services.CreateScope())
     //logger.SetStatus(new Engine.DeleteFile.Ok("test.txt"));
     //logger.Engine.SetStatus(new Contracts.Workflow.ExecuteStep.Now.Ok(7)); // note: Not assignable! Check!
 
-    using (logger.BeginBuzz(new Wires.CopyFile { Path = "test.txt" }))
+    using (logger.BeginWatch(new Wires.CopyFile { Path = "test.txt" }))
     {
         // work...
     }
 
 
-    using (var delete = logger.BeginBuzz(new Wires.DeleteFile { Path = "test.txt" }))
+    using (var delete = logger.BeginWatch(new Wires.DeleteFile { Path = "test.txt" }))
     {
-        delete.LogStatus(new Wires.DeleteFile.Noop { Reason = "File not found." });
-        delete.LogStatus(new Wires.DeleteFile.Noop());
-        delete.LogStatus(new Wires.DeleteFile.Fail());
-        delete.LogStatus(new Wires.DeleteFile.Okay());
-        delete.LogStatus(new Wires.DeleteFile.Noop.NotFound());
+        delete.LogEvent(new Wires.DeleteFile.Noop { Reason = "File not found." });
+        delete.LogEvent(new Wires.DeleteFile.Noop());
+        delete.LogEvent(new Wires.DeleteFile.Fail());
+        delete.LogEvent(new Wires.DeleteFile.Okay());
+        delete.LogEvent(new Wires.DeleteFile.Noop.NotFound());
     }
 
-    using (var quick = logger.BeginBuzz(new BuzzLite("WarmIndex", "Index: {IndexName}", "documents")))
+    using (var quick = logger.BeginWatch(new WatchLite("WarmIndex", "Index: {IndexName}", "documents")))
     {
-        quick.LogStatus(new BuzzLite.Okay("Segments: {SegmentCount}", 7));
+        quick.LogEvent(new WatchLite.Okay("Segments: {SegmentCount}", 7));
     }
 
-    using (var quickBulk = logger.BeginBulk(new BulkLite("ImportRows", "Source: {Source}", "rows.csv")))
+    using (var quickBulk = logger.BeginBatch(new BatchLite("ImportRows", "Source: {Source}", "rows.csv")))
     {
-        using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 1)))
+        using (var item = quickBulk.BeginWatch(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 1)))
         {
-            item.LogStatus(new BulkLiteItem.Okay("Record: {RecordId}", "A-001"));
+            item.LogEvent(new BulkLiteItem.Okay("Record: {RecordId}", "A-001"));
         }
 
-        using (var item = quickBulk.BeginItem(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 2)))
+        using (var item = quickBulk.BeginWatch(new BulkLiteItem("ImportRow", "Row: {RowNumber}", 2)))
         {
-            item.LogStatus(new BulkLiteItem.Noop("Skipped duplicate record."));
+            item.LogEvent(new BulkLiteItem.Noop("Skipped duplicate record."));
         }
 
-        quickBulk.LogStatus(new BulkLite.Okay("Imported quick rows."));
+        quickBulk.LogEvent(new BatchLite.Okay("Imported quick rows."));
     }
 }
 

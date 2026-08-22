@@ -2,7 +2,7 @@ using System.Globalization;
 
 namespace Wiretap.Util;
 
-public sealed class BulkMath
+public sealed class BatchMath
 {
     private readonly Dictionary<string, int> _statusCounts = new(StringComparer.Ordinal);
     private double _durationMean;

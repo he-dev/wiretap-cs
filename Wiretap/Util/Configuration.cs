@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using Wiretap.Util.Buzz2;
+using Wiretap.Util.Buzz;
 
 namespace Wiretap.Util;
 

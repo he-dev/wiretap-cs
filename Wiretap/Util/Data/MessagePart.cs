@@ -1,7 +1,7 @@
 ﻿namespace Wiretap.Util.Data;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public class Remark : Attribute
+public class MessagePart : Attribute
 {
     public string? Label { get; init; }
 

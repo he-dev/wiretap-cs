@@ -3,23 +3,22 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public interface IStatusOf<TBuzz> where TBuzz : Buzz;
+public interface IEventOf<TWatch> where TWatch : Watch;
 
-public interface IItemOf<TBulk> where TBulk : Buzz.Bulk;
+public interface IItemOf<TBatch> where TBatch : Batch;
 
-public abstract class BuzzStatus
+public abstract class WatchEvent
 {
-    private string Code => GetType().Name;
     public abstract string Role { get; }
     public abstract LogLevel Level { get; }
     public Exception? Exception { get; init; }
 
-    public override string ToString() => Code;
+    public override string ToString() => GetType().Name;
 
-    internal abstract class First : BuzzStatus
+    internal abstract class First : WatchEvent
     {
         // core: Ready is framework-owned and starts timing/logging for an active buzz.
-        internal sealed class Ready : First
+        internal sealed class Open : First
         {
             public override string Role => "first";
 
@@ -27,7 +26,7 @@ public abstract class BuzzStatus
         }
     }
 
-    public abstract class Last : BuzzStatus
+    public abstract class Last : WatchEvent
     {
         public override string Role => "last";
 
@@ -48,7 +47,7 @@ public abstract class BuzzStatus
         {
             public override LogLevel Level => LogLevel.Error;
 
-            [Remark(Label = "Exception")]
+            [MessagePart(Label = "Exception")]
             public string? ExceptionMessage => Exception?.Message;
         }
 
@@ -57,12 +56,12 @@ public abstract class BuzzStatus
         {
             public override LogLevel Level => LogLevel.Warning;
 
-            [Remark]
+            [MessagePart]
             public string Reason => "The buzz exited without an explicit last status.";
         }
     }
 
-    internal abstract class Idle : BuzzStatus
+    internal abstract class Idle : WatchEvent
     {
         public override string Role => "idle";
 

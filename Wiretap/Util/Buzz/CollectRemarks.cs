@@ -1,6 +1,6 @@
 using Wiretap.Util.Data;
 
-namespace Wiretap.Util.Buzz2;
+namespace Wiretap.Util.Buzz;
 
 public static class CollectRemarks
 {
@@ -11,7 +11,7 @@ public static class CollectRemarks
             remarkSource.Remarks(builder);
         }
 
-        GetPropertiesByAttribute.Where<Remark>(
+        GetPropertiesByAttribute.Where<MessagePart>(
             source,
             (propertyName, remark, value) =>
             {

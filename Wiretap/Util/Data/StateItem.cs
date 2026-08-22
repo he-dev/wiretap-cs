@@ -1,7 +1,7 @@
 ﻿namespace Wiretap.Util.Data;
 
 [AttributeUsage(AttributeTargets.Property | AttributeTargets.Parameter | AttributeTargets.Field)]
-public class Detail : Attribute
+public class StateItem : Attribute
 {
     public string? Name { get; init; }
 

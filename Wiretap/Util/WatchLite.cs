@@ -3,8 +3,8 @@ using Wiretap.Util.Data;
 
 namespace Wiretap.Util;
 
-public class BuzzLite(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Buzz(name), IRemarkSource
+public class WatchLite(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    : Watch(name), IRemarkSource
 {
     // core: Lite contracts are explicit convenience contracts, not base-type loopholes.
     public void Remarks(RemarkBuilder remarks)
@@ -13,7 +13,7 @@ public class BuzzLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Okay, IStatusOf<BuzzLite>, IRemarkSource
+        : WatchEvent.Last.Okay, IEventOf<WatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -22,7 +22,7 @@ public class BuzzLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Noop, IStatusOf<BuzzLite>, IRemarkSource
+        : WatchEvent.Last.Noop, IEventOf<WatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -31,7 +31,7 @@ public class BuzzLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Fail, IStatusOf<BuzzLite>, IRemarkSource
+        : WatchEvent.Last.Fail, IEventOf<WatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -40,8 +40,8 @@ public class BuzzLite(string name, [StructuredMessageTemplate] string? message =
     }
 }
 
-public class BulkLite(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Buzz.Bulk(name), IRemarkSource
+public class BatchLite(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
+    : Batch(name), IRemarkSource
 {
     // core: BulkLite gives ad-hoc bulks their own typed status family.
     public void Remarks(RemarkBuilder remarks)
@@ -50,7 +50,7 @@ public class BulkLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Okay, IStatusOf<BulkLite>, IRemarkSource
+        : WatchEvent.Last.Okay, IEventOf<BatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -59,7 +59,7 @@ public class BulkLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Noop, IStatusOf<BulkLite>, IRemarkSource
+        : WatchEvent.Last.Noop, IEventOf<BatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -68,7 +68,7 @@ public class BulkLite(string name, [StructuredMessageTemplate] string? message =
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Fail, IStatusOf<BulkLite>, IRemarkSource
+        : WatchEvent.Last.Fail, IEventOf<BatchLite>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -78,7 +78,7 @@ public class BulkLite(string name, [StructuredMessageTemplate] string? message =
 }
 
 public sealed class BulkLiteItem(string name, [StructuredMessageTemplate] string? message = null, params object?[] args)
-    : Buzz(name), IItemOf<BulkLite>, IRemarkSource
+    : Batch.Item(name), IItemOf<BatchLite>, IRemarkSource
 {
     // core: BulkLiteItem belongs to BulkLite but derives from the ordinary buzz base.
     public void Remarks(RemarkBuilder remarks)
@@ -87,7 +87,7 @@ public sealed class BulkLiteItem(string name, [StructuredMessageTemplate] string
     }
 
     public sealed class Okay([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Okay, IStatusOf<BulkLiteItem>, IRemarkSource
+        : WatchEvent.Last.Okay, IEventOf<BulkLiteItem>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -96,7 +96,7 @@ public sealed class BulkLiteItem(string name, [StructuredMessageTemplate] string
     }
 
     public sealed class Noop([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Noop, IStatusOf<BulkLiteItem>, IRemarkSource
+        : WatchEvent.Last.Noop, IEventOf<BulkLiteItem>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {
@@ -105,7 +105,7 @@ public sealed class BulkLiteItem(string name, [StructuredMessageTemplate] string
     }
 
     public sealed class Fail([StructuredMessageTemplate] string? message = null, params object?[] args)
-        : BuzzStatus.Last.Fail, IStatusOf<BulkLiteItem>, IRemarkSource
+        : WatchEvent.Last.Fail, IEventOf<BulkLiteItem>, IRemarkSource
     {
         public void Remarks(RemarkBuilder remarks)
         {

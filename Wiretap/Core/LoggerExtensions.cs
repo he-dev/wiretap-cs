@@ -7,28 +7,22 @@ public static class LoggerExtensions
 {
     extension<T>(ILogger<T> logger)
     {
-        public BuzzContext<TBuzz> BeginBuzz<TBuzz>(TBuzz buzz)
-            where TBuzz : Buzz
+        public WatchContext<TWatch> BeginWatch<TWatch>(TWatch watch) where TWatch : Watch
         {
-            buzz.Subscribe(new BuzzLogger(logger));
-            buzz.SetStatus(new BuzzStatus.First.Ready());
-            return new(buzz);
+            return WatchContext<TWatch>.Builder.Open(logger, watch);
         }
 
-        public BulkContext<TBulk> BeginBulk<TBulk>(TBulk bulk)
-            where TBulk : Buzz.Bulk
+        public BatchContext<TBatch> BeginBatch<TBatch>(TBatch batch) where TBatch : Batch
         {
-            bulk.Subscribe(new BuzzLogger(logger));
-            bulk.SetStatus(new BuzzStatus.First.Ready());
-            return new(bulk);
+            return BatchContext<TBatch>.Builder.Open(logger, batch);
         }
 
-        public void LogStatus<TBuzz, TStatus>(TBuzz buzz, TStatus status)
-            where TBuzz : Buzz
-            where TStatus : BuzzStatus, IStatusOf<TBuzz>
+        public void LogEvent<TWatch, TWatchEvent>(TWatch watch, TWatchEvent watchEvent)
+            where TWatch : Watch
+            where TWatchEvent : WatchEvent, IEventOf<TWatch>
         {
-            using var context = logger.BeginBuzz(buzz);
-            context.LogStatus(status);
+            using var context = logger.BeginWatch(watch);
+            context.LogEvent(watchEvent);
         }
     }
 }

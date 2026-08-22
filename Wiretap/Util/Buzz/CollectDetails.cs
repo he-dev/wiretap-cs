@@ -1,6 +1,6 @@
 using Wiretap.Util.Data;
 
-namespace Wiretap.Util.Buzz2;
+namespace Wiretap.Util.Buzz;
 
 public static class CollectDetails
 {
@@ -11,7 +11,7 @@ public static class CollectDetails
             detailSource.Details(builder);
         }
 
-        GetPropertiesByAttribute.Where<Detail>(
+        GetPropertiesByAttribute.Where<StateItem>(
             source,
             (propertyName, detail, value) => { builder.Add(new PropertyName(detail.Name ?? propertyName), value, options => options.Cascade = detail.Cascade); }
         );
