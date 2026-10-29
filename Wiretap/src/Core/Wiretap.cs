@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
@@ -88,9 +89,9 @@ public interface IActivityLogger : ILogger, IDisposable
     string? Push(Event next, LogLevel logLevel);
 }
 
-public class ActivityLogger(string about, (string Name, object? Value)[] properties, Action<System.Diagnostics.Activity> configure, ILogger outer) : IActivityLogger
+public class ActivityLogger(string about, (string Name, object? Value)[] properties, Action<System.Diagnostics.Activity> configure, ILogger outer, ActivityTraceId? traceId = null, ActivitySpanId? parentId = null) : IActivityLogger
 {
-    private System.Diagnostics.Activity Activity { get; } = CreateActivity(about, configure);
+    private System.Diagnostics.Activity Activity { get; } = CreateActivity(about, configure, traceId, parentId);
 
     private IDisposable? LoggerScope { get; } = outer.BeginScopeWith
     ([
@@ -115,6 +116,11 @@ public class ActivityLogger(string about, (string Name, object? Value)[] propert
                     ? outer.BeginScopeWith(("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds))
                     : null;
 
+            // core: Read IDs after Zero starts the activity, keeping them available to every log provider.
+            using (Activity.Id is null ? null : outer.BeginScopeWith(
+                ("trace.id", Activity.TraceId.ToHexString()),
+                ("trace.span_id", Activity.SpanId.ToHexString()),
+                ("trace.parent_id", Activity.ParentSpanId == default ? null : Activity.ParentSpanId.ToHexString())))
             using (durationScope)
             {
                 outer.Log(logLevel, eventId, state, exception, formatter);
@@ -184,9 +190,20 @@ public class ActivityLogger(string about, (string Name, object? Value)[] propert
         }
     }
 
-    private static System.Diagnostics.Activity CreateActivity(string name, Action<System.Diagnostics.Activity> configure)
+    private static System.Diagnostics.Activity CreateActivity(string name, Action<System.Diagnostics.Activity> configure, ActivityTraceId? traceId, ActivitySpanId? parentId)
     {
+        if (parentId.HasValue && !traceId.HasValue)
+        {
+            throw new ArgumentException("An external parent span ID requires its trace ID.", nameof(parentId));
+        }
+
         var activity = new System.Diagnostics.Activity(name);
+        if (traceId.HasValue)
+        {
+            // core: Explicit incoming context takes precedence over Activity.Current.
+            activity.SetIdFormat(ActivityIdFormat.W3C);
+            activity.SetParentId(traceId.Value, parentId.GetValueOrDefault());
+        }
         configure(activity);
         return activity;
     }
@@ -215,19 +232,23 @@ public static class LoggerExtensions
         (
             string about,
             (string Name, object? Value)[]? properties = null,
-            Action<System.Diagnostics.Activity>? configure = null
+            Action<System.Diagnostics.Activity>? configure = null,
+            ActivityTraceId? traceId = null,
+            ActivitySpanId? parentId = null
         )
         {
-            return new ActivityLogger(about, properties ?? [], configure ?? (_ => { }), logger);
+            return new ActivityLogger(about, properties ?? [], configure ?? (_ => { }), logger, traceId, parentId);
         }
 
         public IActivityLogger BeginScopeAbout<TAbout>
         (
             (string Name, object? Value)[]? properties = null,
-            Action<System.Diagnostics.Activity>? configure = null
+            Action<System.Diagnostics.Activity>? configure = null,
+            ActivityTraceId? traceId = null,
+            ActivitySpanId? parentId = null
         )
         {
-            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure);
+            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure, traceId, parentId);
         }
 
         //public IPropertyLogger With(LoggerProperty property) => new PropertyLogger(logger, property);

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Wiretap.Core;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,9 +34,26 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginScopeWith(("loopCount", loopCount)))
+    using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]))
     {
         scope.System.Zero.LogInformation("Hello Wiretap!");
+
+        var stats = new Benchmark();
+        foreach (var found in new[] { true, false, true })
+        {
+            // core: The sample is recorded when the using block exits.
+            using var sample = stats.Measure();
+            System.Threading.Thread.Sleep(10); // Simulate the work being measured.
+            sample.CountAs(found ? "found" : "not-found");
+        }
+
+        scope.System.Last.LogInformation(
+            "Processed {FilesTotal} files at {FilesPerSecond:F2}/s; found {FilesFound}, not found {FilesNotFound}, found rate {FoundRate:P0}.",
+            stats.Total.Count,
+            stats.Total.ThroughputMs * 1000,
+            stats["found"].Count,
+            stats["not-found"].Count,
+            stats.Ratio("found"));
     }
 }
 
