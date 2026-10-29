@@ -48,14 +48,12 @@ public class EventLogger(ILogger logger, Event activityEvent) : IPropertyLogger
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        // core: Try pushing the event when inside a scene, otherwise skip logging due to an invalid event sequence.
-        if (this.ActivityLogger is { } activityLogger && !activityLogger.Push(activityEvent, logLevel))
-        {
-            return;
-        }
+        // core: Advance the lifecycle even when this log level is filtered out.
+        var fixme = this.ActivityLogger?.Push(activityEvent, logLevel);
 
         if (IsEnabled(logLevel))
         {
+            using (fixme is null ? null : logger.BeginScopeWith(("fixme", new[] { fixme })))
             using (logger.BeginScopeWith(("activity.event", activityEvent)))
             {
                 logger.Log(logLevel, eventId, state, exception, formatter);
@@ -87,7 +85,7 @@ public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] prope
 
 public interface IActivityLogger : ILogger, IDisposable
 {
-    bool Push(Event next, LogLevel logLevel);
+    string? Push(Event next, LogLevel logLevel);
 }
 
 public class ActivityLogger(string about, (string Name, object? Value)[] properties, Action<System.Diagnostics.Activity> configure, ILogger outer) : IActivityLogger
@@ -124,17 +122,17 @@ public class ActivityLogger(string about, (string Name, object? Value)[] propert
         }
     }
 
-    public bool Push(Event next, LogLevel logLevel)
+    public string? Push(Event next, LogLevel logLevel)
     {
         switch (next)
         {
             case Event.Zero when RecentEvent is null:
                 RecentEvent = next;
                 Activity.Start();
-                return true;
+                return null;
             case Event.Tick when RecentEvent is Event.Zero or Event.Tick:
                 RecentEvent = next;
-                return true;
+                return null;
             case Event.Last when RecentEvent is Event.Zero or Event.Tick:
                 RecentEvent = next;
                 Activity.SetEndTime(DateTime.UtcNow);
@@ -155,32 +153,35 @@ public class ActivityLogger(string about, (string Name, object? Value)[] propert
                         break;
                 }
 
-                return true;
+                return null;
             default:
-                this.System.LogWarning("Unexpected event '{wiretap.event.next}' following '{wiretap.event.recent}'.", next, RecentEvent);
-                return false;
+                // core: Preserve the original log entry and explain the invalid transition without changing state.
+                return next switch
+                {
+                    Event.Zero => "zero-must-occur-only-once",
+                    Event.Tick => "tick-must-follow-zero-or-tick",
+                    Event.Last when RecentEvent is null => "last-must-follow-zero-or-tick",
+                    Event.Last => "last-must-occur-only-once",
+                    _ => "event-must-be-zero-tick-or-last",
+                };
         }
     }
 
     public void Dispose()
     {
-        switch (RecentEvent)
+        try
         {
-            case null:
-                // core: Establish proper order of events.
-                Push(Event.Zero, LogLevel.None);
-                Push(Event.Last, LogLevel.None);
-                this.LogWarning("Activity has not been properly initialized with Event.Zero.");
-                break;
-            case Event.Zero or Event.Tick:
-                // core: Establish proper order of events.
-                Push(Event.Last, LogLevel.None);
-                this.LogWarning("Activity has not been properly finalized with Event.Last.");
-                break;
+            // core: Emit a missing Last normally; invalid transitions carry fixme instead of being repaired.
+            if (RecentEvent is not Event.Last)
+            {
+                this.System.Last.LogInformation(null);
+            }
         }
-
-        Activity.Dispose();
-        LoggerScope?.Dispose();
+        finally
+        {
+            Activity.Dispose();
+            LoggerScope?.Dispose();
+        }
     }
 
     private static System.Diagnostics.Activity CreateActivity(string name, Action<System.Diagnostics.Activity> configure)
