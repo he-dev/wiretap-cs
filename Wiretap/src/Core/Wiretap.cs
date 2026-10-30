@@ -7,54 +7,51 @@ using Microsoft.Extensions.Logging;
 // ReSharper disable once CheckNamespace
 namespace Aion.Meta.Logging.Wiretap;
 
-public enum Event
+public sealed record Fixme(string Constraint);
+
+public enum ActivityEvent
 {
     Zero,
     Tick,
     Last,
 }
 
-public interface IPropertyLogger : ILogger
+public enum EnvelopeMode
 {
-    public ILogger Outer { get; }
+    Auto,
+    ZeroOnly,
+    LastOnly,
 }
 
-public class StoryLogger(ILogger logger, string story) : IPropertyLogger
-{
-    public ILogger Outer => logger;
 
+public class StoryLogger(ILogger logger, string story) : ILogger
+{
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
 
     public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        if (IsEnabled(logLevel))
-        {
-            using (logger.BeginScopeWith(("story", story)))
-            {
-                logger.Log(logLevel, eventId, state, exception, formatter);
-            }
-        }
+        // core: Forward filtered calls too so an underlying event logger can advance its lifecycle.
+        using var storyScope = IsEnabled(logLevel) ? logger.BeginScopeWith(("story", story)) : null;
+        logger.Log(logLevel, eventId, state, exception, formatter);
     }
 }
 
-public class EventLogger(ILogger logger, Event activityEvent) : IPropertyLogger
+public class EventLogger(ActivityLogger logger, ActivityEvent activityEvent) : ILogger
 {
-    public ILogger Outer => logger;
-
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
 
     public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        // core: Advance the lifecycle even when this log level is filtered out.
-        var fixme = this.ActivityLogger?.Push(activityEvent, logLevel);
+        // core: Advance the lifecycle even when this log level is lower than the current one.
+        var fixme = logger.MoveNext(activityEvent, logLevel);
 
         if (IsEnabled(logLevel))
         {
-            using (fixme is null ? null : logger.BeginScopeWith(("fixme", new[] { fixme })))
+            using (fixme is null ? null : logger.BeginScopeWith(("fixme", new[] { fixme.Constraint })))
             using (logger.BeginScopeWith(("activity.event", activityEvent)))
             {
                 logger.Log(logLevel, eventId, state, exception, formatter);
@@ -63,9 +60,7 @@ public class EventLogger(ILogger logger, Event activityEvent) : IPropertyLogger
     }
 }
 
-public interface IPropertyScope : ILogger, IDisposable;
-
-public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] properties) : IPropertyScope
+public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] properties) : ILogger, IDisposable
 {
     private IDisposable? Scope { get; } = logger.BeginScope(properties);
 
@@ -84,72 +79,35 @@ public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] prope
     public void Dispose() => Scope?.Dispose();
 }
 
-public interface IActivityLogger : ILogger, IDisposable
+public abstract class ActivityScope : ILogger, IDisposable
 {
-    ILogger Outer { get; }
+    protected abstract ILogger Outer { get; }
+    public abstract ILogger Zero { get; }
+    public abstract ILogger Tick { get; }
+    public abstract ILogger Last { get; }
 
-    IDisposable? ILogger.BeginScope<TState>(TState state)
+    public virtual IDisposable? BeginScope<TState>(TState state) where TState : notnull
         => Outer.BeginScope(state);
 
-    bool ILogger.IsEnabled(LogLevel logLevel)
+    public virtual bool IsEnabled(LogLevel logLevel)
         => Outer.IsEnabled(logLevel);
 
-    void ILogger.Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public virtual void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         => Outer.Log(logLevel, eventId, state, exception, formatter);
 
-    string? Push(Event next, LogLevel logLevel)
-        => Outer is IActivityLogger activity ? activity.Push(next, logLevel) : null;
+    public abstract void Dispose();
 }
-
-public enum EnvelopeMode
-{
-    Auto,
-    ZeroOnly,
-    LastOnly,
-}
-
-public sealed class EnvelopeLogger : IActivityLogger
-{
-    public ILogger Outer { get; }
-
-    private EnvelopeMode Mode { get; }
-
-    public EnvelopeLogger(IActivityLogger outer, EnvelopeMode mode = EnvelopeMode.Auto)
-    {
-        Outer = outer;
-        Mode = mode;
-
-        if (mode is EnvelopeMode.Auto or EnvelopeMode.ZeroOnly)
-        {
-            this.System.Zero.LogDebug(null);
-        }
-    }
-
-    public void Dispose()
-    {
-        try
-        {
-            if (Mode is EnvelopeMode.Auto or EnvelopeMode.LastOnly)
-            {
-                this.System.Last.LogInformation(null);
-            }
-        }
-        finally
-        {
-            // core: The envelope owns the activity scope supplied to its constructor.
-            ((IActivityLogger)Outer).Dispose();
-        }
-    }
-}
-
 public class ActivityLogger
 (
     ILogger outer,
     System.Diagnostics.Activity activity,
     IDisposable? loggerScope
-) : IActivityLogger
+) : ActivityScope
 {
-    public ILogger Outer => outer;
+    protected override ILogger Outer => outer;
+    public override ILogger Zero => new EventLogger(this, ActivityEvent.Zero);
+    public override ILogger Tick => new EventLogger(this, ActivityEvent.Tick);
+    public override ILogger Last => new EventLogger(this, ActivityEvent.Last);
     private System.Diagnostics.Activity Activity { get; } = activity;
     private IDisposable? LoggerScope { get; } = loggerScope;
 
@@ -169,24 +127,24 @@ public class ActivityLogger
         ([
             ("activity.about", about),
             // core: Apply tick-event by default; explicit events are validated independently of trace activation.
-            ("activity.event", Event.Tick),
+            ("activity.event", ActivityEvent.Tick),
             .. properties ?? []
         ]);
         return new ActivityLogger(logger, activity, scope);
     }
 
-    private Event? RecentEvent { get; set; }
+    private ActivityEvent? RecentEvent { get; set; }
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => outer.BeginScope(state);
+    public override IDisposable? BeginScope<TState>(TState state) => outer.BeginScope(state);
 
-    public bool IsEnabled(LogLevel logLevel) => outer.IsEnabled(logLevel);
+    public override bool IsEnabled(LogLevel logLevel) => outer.IsEnabled(logLevel);
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public override void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (IsEnabled(logLevel))
         {
             using var durationScope =
-                RecentEvent is Event.Last
+                RecentEvent is ActivityEvent.Last
                     ? outer.BeginScopeWith(("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds))
                     : null;
 
@@ -202,17 +160,17 @@ public class ActivityLogger
         }
     }
 
-    public string? Push(Event next, LogLevel logLevel)
+    internal Fixme? MoveNext(ActivityEvent next, LogLevel logLevel)
     {
         switch (next)
         {
-            case Event.Zero when RecentEvent is null:
+            case ActivityEvent.Zero when RecentEvent is null:
                 RecentEvent = next;
                 return null;
-            case Event.Tick when RecentEvent is Event.Zero or Event.Tick:
+            case ActivityEvent.Tick when RecentEvent is ActivityEvent.Zero or ActivityEvent.Tick:
                 RecentEvent = next;
                 return null;
-            case Event.Last when RecentEvent is Event.Zero or Event.Tick:
+            case ActivityEvent.Last when RecentEvent is ActivityEvent.Zero or ActivityEvent.Tick:
                 RecentEvent = next;
                 Activity.SetEndTime(DateTime.UtcNow);
                 switch (logLevel)
@@ -237,26 +195,63 @@ public class ActivityLogger
                 // core: Preserve the original log entry and explain the invalid transition without changing state.
                 return next switch
                 {
-                    Event.Zero => "zero-must-occur-only-once",
-                    Event.Tick => "tick-must-follow-zero-or-tick",
-                    Event.Last when RecentEvent is null => "last-must-follow-zero-or-tick",
-                    Event.Last => "last-must-occur-only-once",
+                    ActivityEvent.Zero => new Fixme("zero-must-occur-only-once"),
+                    ActivityEvent.Tick => new Fixme("tick-must-follow-zero-or-tick"),
+                    ActivityEvent.Last when RecentEvent is null => new Fixme("last-must-follow-zero-or-tick"),
+                    ActivityEvent.Last => new Fixme("last-must-occur-only-once"),
                     // note: This is to make the compiler happy.
                     _ => throw new ArgumentOutOfRangeException(nameof(next), next, null)
                 };
         }
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         // core: Log a warning-level Last if the activity was not explicitly finalized.
-        if (RecentEvent is not Event.Last)
+        if (RecentEvent is not ActivityEvent.Last)
         {
-            this.System.Last.LogWarning(null);
+            Last.System.LogWarning(null);
         }
 
         Activity.Dispose();
         LoggerScope?.Dispose();
+    }
+}
+
+public sealed class EnvelopeLogger : ActivityScope
+{
+    protected override ActivityScope Outer { get; }
+    public override ILogger Zero => Outer.Zero;
+    public override ILogger Tick => Outer.Tick;
+    public override ILogger Last => Outer.Last;
+
+    private EnvelopeMode Mode { get; }
+
+    public EnvelopeLogger(ActivityScope outer, EnvelopeMode mode = EnvelopeMode.Auto)
+    {
+        Outer = outer;
+        Mode = mode;
+
+        if (mode is EnvelopeMode.Auto or EnvelopeMode.ZeroOnly)
+        {
+            outer.Zero.System.LogDebug(null);
+        }
+    }
+
+    public override void Dispose()
+    {
+        try
+        {
+            if (Mode is EnvelopeMode.Auto or EnvelopeMode.LastOnly)
+            {
+                Outer.Last.System.LogInformation(null);
+            }
+        }
+        finally
+        {
+            // core: The envelope owns the activity scope supplied to its constructor.
+            Outer.Dispose();
+        }
     }
 }
 
@@ -290,7 +285,7 @@ internal sealed class ContinuationScope(System.Diagnostics.Activity activity, ID
         var scope = logger.BeginScopeWith
         (
             ("activity.about", about),
-            ("activity.event", Event.Tick),
+            ("activity.event", ActivityEvent.Tick),
             ("trace.id", activity.TraceId.ToHexString()),
             ("trace.span_id", activity.SpanId.ToHexString()),
             ("trace.parent_id", activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString())
@@ -327,12 +322,12 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
-        public IPropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
+        public PropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
         {
             return new PropertyScope(logger, [.. properties.Select(p => new KeyValuePair<string, object?>(p.Name, p.Value))]);
         }
 
-        public IActivityLogger BeginScopeAbout
+        public ActivityScope BeginScopeAbout
         (
             string about,
             (string Name, object? Value)[]? properties = null,
@@ -342,7 +337,7 @@ public static class LoggerExtensions
             return ActivityLogger.About(logger, about, properties, configure);
         }
 
-        public IActivityLogger BeginScopeAbout<TAbout>
+        public ActivityScope BeginScopeAbout<TAbout>
         (
             (string Name, object? Value)[]? properties = null,
             Action<System.Diagnostics.Activity>? configure = null
@@ -362,34 +357,12 @@ public static class LoggerExtensions
             return ContinuationScope.About(logger, about, traceId, parentId, configure);
         }
 
-        public IPropertyLogger Domain => new StoryLogger(logger, "Domain");
-        public IPropertyLogger System => new StoryLogger(logger, "System");
+        public ILogger Domain => new StoryLogger(logger, "Domain");
+        public ILogger System => new StoryLogger(logger, "System");
     }
 
-    extension(IActivityLogger logger)
+    extension(ActivityScope logger)
     {
-        public IActivityLogger LogEnvelope(EnvelopeMode mode = EnvelopeMode.Auto) => new EnvelopeLogger(logger, mode);
-    }
-
-    extension(IPropertyLogger propertyLogger)
-    {
-        // core: Locates the scene.
-        public IActivityLogger? ActivityLogger
-        {
-            get
-            {
-                ILogger current = propertyLogger;
-                while (current is IPropertyLogger decorator)
-                {
-                    current = decorator.Outer;
-                }
-
-                return current as IActivityLogger;
-            }
-        }
-
-        public IPropertyLogger Zero => new EventLogger(propertyLogger, Event.Zero);
-        public IPropertyLogger Tick => new EventLogger(propertyLogger, Event.Tick);
-        public IPropertyLogger Last => new EventLogger(propertyLogger, Event.Last);
+        public ActivityScope LogEnvelope(EnvelopeMode mode = EnvelopeMode.Auto) => new EnvelopeLogger(logger, mode);
     }
 }

@@ -36,7 +36,7 @@ using (var services = app.Services.CreateScope())
 
     using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]).LogEnvelope(EnvelopeMode.LastOnly))
     {
-        scope.System.Zero.LogInformation("Hello Wiretap!");
+        scope.Zero.System.LogInformation("Hello Wiretap!");
 
         var stats = new Benchmark();
         foreach (var found in new[] { true, false, true })
@@ -47,7 +47,7 @@ using (var services = app.Services.CreateScope())
             sample.CountAs(found ? "found" : "not-found");
         }
 
-        scope.System.Tick.LogInformation(
+        scope.Tick.System.LogInformation(
             "Processed {FilesTotal} files at {FilesPerSecond:F2}/s; found {FilesFound}, not found {FilesNotFound}, found rate {FoundRate:P0}.",
             stats.Total.Count,
             stats.Total.ThroughputMs * 1000,
