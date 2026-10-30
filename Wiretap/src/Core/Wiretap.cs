@@ -111,11 +111,12 @@ public enum EnvelopeMode
 public sealed class EnvelopeLogger : IActivityLogger
 {
     public ILogger Outer { get; }
+
     private EnvelopeMode Mode { get; }
 
-    public EnvelopeLogger(IActivityLogger inner, EnvelopeMode mode = EnvelopeMode.Auto)
+    public EnvelopeLogger(IActivityLogger outer, EnvelopeMode mode = EnvelopeMode.Auto)
     {
-        Outer = inner;
+        Outer = outer;
         Mode = mode;
 
         if (mode is EnvelopeMode.Auto or EnvelopeMode.ZeroOnly)
@@ -143,25 +144,36 @@ public sealed class EnvelopeLogger : IActivityLogger
 
 public class ActivityLogger
 (
-    string about,
-    (string Name, object? Value)[] properties,
-    Action<System.Diagnostics.Activity> configure,
     ILogger outer,
-    string? traceId = null,
-    string? parentId = null
+    System.Diagnostics.Activity activity,
+    IDisposable? loggerScope
 ) : IActivityLogger
 {
     public ILogger Outer => outer;
+    private System.Diagnostics.Activity Activity { get; } = activity;
+    private IDisposable? LoggerScope { get; } = loggerScope;
 
-    private System.Diagnostics.Activity Activity { get; } = CreateActivity(about, configure, traceId, parentId);
+    public static ActivityLogger About
+    (
+        ILogger logger,
+        string about,
+        (string Name, object? Value)[]? properties = null,
+        Action<System.Diagnostics.Activity>? configure = null
+    )
+    {
+        var activity = new System.Diagnostics.Activity(about);
+        configure?.Invoke(activity);
+        activity.Start();
 
-    private IDisposable? LoggerScope { get; } = outer.BeginScopeWith
-    ([
-        ("activity.about", about),
-        // core: Apply tick-event by default.
-        ("activity.event", Event.Tick),
-        .. properties
-    ]);
+        var scope = logger.BeginScopeWith
+        ([
+            ("activity.about", about),
+            // core: Apply tick-event by default; explicit events are validated independently of trace activation.
+            ("activity.event", Event.Tick),
+            .. properties ?? []
+        ]);
+        return new ActivityLogger(logger, activity, scope);
+    }
 
     private Event? RecentEvent { get; set; }
 
@@ -173,22 +185,20 @@ public class ActivityLogger
     {
         if (IsEnabled(logLevel))
         {
-            var durationScope =
+            using var durationScope =
                 RecentEvent is Event.Last
                     ? outer.BeginScopeWith(("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds))
                     : null;
 
-            // core: Read IDs after Zero starts the activity, keeping them available to every log provider.
-            using (Activity.Id is null
-                       ? null
-                       : outer.BeginScopeWith(
-                           ("trace.id", Activity.TraceId.ToHexString()),
-                           ("trace.span_id", Activity.SpanId.ToHexString()),
-                           ("trace.parent_id", Activity.ParentSpanId == default ? null : Activity.ParentSpanId.ToHexString())))
-            using (durationScope)
-            {
-                outer.Log(logLevel, eventId, state, exception, formatter);
-            }
+            var parentId = Activity.ParentSpanId == default ? null : Activity.ParentSpanId.ToHexString();
+            using var traceScope = outer.BeginScopeWith
+            (
+                ("trace.id", Activity.TraceId.ToHexString()),
+                ("trace.span_id", Activity.SpanId.ToHexString()),
+                ("trace.parent_id", parentId)
+            );
+
+            outer.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 
@@ -198,7 +208,6 @@ public class ActivityLogger
         {
             case Event.Zero when RecentEvent is null:
                 RecentEvent = next;
-                Activity.Start();
                 return null;
             case Event.Tick when RecentEvent is Event.Zero or Event.Tick:
                 RecentEvent = next;
@@ -249,54 +258,67 @@ public class ActivityLogger
         Activity.Dispose();
         LoggerScope?.Dispose();
     }
+}
 
-    private static System.Diagnostics.Activity CreateActivity(string name, Action<System.Diagnostics.Activity> configure, string? traceId, string? parentId)
+/// <summary>Establishes incoming trace context independently of activity event logging.</summary>
+internal sealed class ContinuationScope(System.Diagnostics.Activity activity, IDisposable? scope) : IDisposable
+{
+    private System.Diagnostics.Activity Activity { get; } = activity;
+    private IDisposable? Scope { get; } = scope;
+
+    public void Dispose()
     {
-        if (parentId is not null && traceId is null)
-        {
-            throw new ArgumentException("An external parent span ID requires its trace ID.", nameof(parentId));
-        }
+        Scope?.Dispose();
+        Activity.Dispose();
+    }
 
+    public static ContinuationScope About
+    (
+        ILogger logger,
+        string about,
+        string traceId,
+        string? parentId = null,
+        Action<System.Diagnostics.Activity>? configure = null
+    )
+    {
+        ArgumentNullException.ThrowIfNull(logger);
+        ArgumentNullException.ThrowIfNull(traceId);
+
+        var activity = CreateActivity(about, traceId, parentId, configure);
+
+        // core: Ordinary activity scopes inherit this context through Activity.Current.
+        var scope = logger.BeginScopeWith
+        (
+            ("activity.about", about),
+            ("activity.event", Event.Tick),
+            ("trace.id", activity.TraceId.ToHexString()),
+            ("trace.span_id", activity.SpanId.ToHexString()),
+            ("trace.parent_id", activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString())
+        );
+        return new ContinuationScope(activity, scope);
+    }
+
+    private static System.Diagnostics.Activity CreateActivity
+    (
+        string name,
+        string traceId,
+        string? parentId,
+        Action<System.Diagnostics.Activity>? configure = null
+    )
+    {
         var activity = new System.Diagnostics.Activity(name);
-        if (traceId is not null)
-        {
-            ActivityTraceId parsedTraceId;
-            try
-            {
-                parsedTraceId = ActivityTraceId.CreateFromString(traceId.AsSpan());
-                if (parsedTraceId == default)
-                {
-                    throw new ArgumentException("The trace ID cannot be all zeros.");
-                }
-            }
-            catch (Exception exception) when (exception is ArgumentException or FormatException)
-            {
-                throw new ArgumentException("Expected a nonzero trace ID of 32 lowercase hexadecimal characters.", nameof(traceId), exception);
-            }
+        var parsedTraceId = ActivityTraceId.CreateFromString(traceId.AsSpan());
+        var parsedParentId =
+            parentId is null
+                ? default
+                : ActivitySpanId.CreateFromString(parentId.AsSpan());
 
-            var parsedParentId = default(ActivitySpanId);
-            if (parentId is not null)
-            {
-                try
-                {
-                    parsedParentId = ActivitySpanId.CreateFromString(parentId.AsSpan());
-                    if (parsedParentId == default)
-                    {
-                        throw new ArgumentException("The parent span ID cannot be all zeros.");
-                    }
-                }
-                catch (Exception exception) when (exception is ArgumentException or FormatException)
-                {
-                    throw new ArgumentException("Expected a nonzero parent span ID of 16 lowercase hexadecimal characters.", nameof(parentId), exception);
-                }
-            }
+        // core: Explicit incoming context takes precedence over Activity.Current.
+        activity.SetIdFormat(ActivityIdFormat.W3C);
+        activity.SetParentId(parsedTraceId, parsedParentId);
 
-            // core: Explicit incoming context takes precedence over Activity.Current.
-            activity.SetIdFormat(ActivityIdFormat.W3C);
-            activity.SetParentId(parsedTraceId, parsedParentId);
-        }
-
-        configure(activity);
+        configure?.Invoke(activity);
+        activity.Start();
         return activity;
     }
 }
@@ -305,16 +327,6 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
-        // util: The built-in BeginScope does not support anonymous objects, thus this helper.
-        public IDisposable? BeginScopeFrom<T>(T state) where T : notnull
-        {
-            var properties =
-                from p in state.GetType().GetProperties()
-                select new KeyValuePair<string, object?>(p.Name, p.GetValue(state));
-
-            return logger.BeginScope(properties);
-        }
-
         public IPropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
         {
             return new PropertyScope(logger, [.. properties.Select(p => new KeyValuePair<string, object?>(p.Name, p.Value))]);
@@ -324,26 +336,31 @@ public static class LoggerExtensions
         (
             string about,
             (string Name, object? Value)[]? properties = null,
-            Action<System.Diagnostics.Activity>? configure = null,
-            string? traceId = null,
-            string? parentId = null
+            Action<System.Diagnostics.Activity>? configure = null
         )
         {
-            return new ActivityLogger(about, properties ?? [], configure ?? (_ => { }), logger, traceId, parentId);
+            return ActivityLogger.About(logger, about, properties, configure);
         }
 
         public IActivityLogger BeginScopeAbout<TAbout>
         (
             (string Name, object? Value)[]? properties = null,
-            Action<System.Diagnostics.Activity>? configure = null,
-            string? traceId = null,
-            string? parentId = null
+            Action<System.Diagnostics.Activity>? configure = null
         )
         {
-            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure, traceId, parentId);
+            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure);
         }
 
-        //public IPropertyLogger With(LoggerProperty property) => new PropertyLogger(logger, property);
+        public IDisposable ContinueScopeAbout
+        (
+            string about,
+            string traceId,
+            string? parentId = null,
+            Action<System.Diagnostics.Activity>? configure = null
+        )
+        {
+            return ContinuationScope.About(logger, about, traceId, parentId, configure);
+        }
 
         public IPropertyLogger Domain => new StoryLogger(logger, "Domain");
         public IPropertyLogger System => new StoryLogger(logger, "System");
@@ -351,8 +368,7 @@ public static class LoggerExtensions
 
     extension(IActivityLogger logger)
     {
-        public IActivityLogger LogEnvelope(EnvelopeMode mode = EnvelopeMode.Auto)
-            => new EnvelopeLogger(logger, mode);
+        public IActivityLogger LogEnvelope(EnvelopeMode mode = EnvelopeMode.Auto) => new EnvelopeLogger(logger, mode);
     }
 
     extension(IPropertyLogger propertyLogger)
