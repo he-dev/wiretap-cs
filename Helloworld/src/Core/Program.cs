@@ -1,11 +1,11 @@
 using System;
-using Aion.Meta.Logging.Wiretap;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Wiretap.Core;
+using Wiretap.Util;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -34,10 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="src\Core\Interface\" />
-    <Folder Include="src\Core\Objective\" />
     <Folder Include="src\Meta\" />
-    <Folder Include="src\Util\" />
   </ItemGroup>
 
 </Project>
