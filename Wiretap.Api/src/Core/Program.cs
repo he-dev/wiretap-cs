@@ -34,7 +34,7 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]))
+    using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]).LogEnvelope(EnvelopeMode.LastOnly))
     {
         scope.System.Zero.LogInformation("Hello Wiretap!");
 
@@ -47,7 +47,7 @@ using (var services = app.Services.CreateScope())
             sample.CountAs(found ? "found" : "not-found");
         }
 
-        scope.System.Last.LogInformation(
+        scope.System.Tick.LogInformation(
             "Processed {FilesTotal} files at {FilesPerSecond:F2}/s; found {FilesFound}, not found {FilesNotFound}, found rate {FoundRate:P0}.",
             stats.Total.Count,
             stats.Total.ThroughputMs * 1000,
