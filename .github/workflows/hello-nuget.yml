@@ -22,10 +22,14 @@ jobs:
           dotnet-version: "10.0.x"
       
       - name: Build
-        run: dotnet build --configuration Release
+        run: dotnet build ./Wiretap/Wiretap.csproj --configuration Release
 
       - name: Pack
-        run: dotnet pack --configuration Release --no-build --output ./packages
+        run: |
+          dotnet pack ./Wiretap/Wiretap.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./packages
 
       - name: Authenticate with NuGet
         id: nuget
