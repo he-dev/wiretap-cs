@@ -8,21 +8,27 @@
   </PropertyGroup>
 
   <PropertyGroup Label="NuGet">
+    <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Wiretap</PackageId>
-    <Version>1.0.0</Version>
+    <Version>13.0.0</Version>
     <Authors>HeDev</Authors>
     <Company>HeDev</Company>
-    <Description>Contract-based logging extension.</Description>
-    <PackageTags>logging;observability;telemetry</PackageTags>
+    <Description>Logging extensions to produce logs that are easier to organize.</Description>
+    <PackageTags>logging;observability;telemetry;classification;understanding</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-<!--    <PackageReadmeFile>README.md</PackageReadmeFile>-->
-    <RepositoryUrl>https://github.com/he-dev/wiretap-dotnet</RepositoryUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/he-dev/wiretap-cs</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageProjectUrl>https://github.com/he-dev/wiretap-dotnet</PackageProjectUrl>
+    <PackageProjectUrl>https://github.com/he-dev/wiretap-cs</PackageProjectUrl>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+  
+  <ItemGroup>
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Include="../LICENSE" Pack="true" PackagePath="/" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
