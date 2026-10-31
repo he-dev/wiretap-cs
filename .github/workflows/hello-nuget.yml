@@ -5,12 +5,42 @@ on:
   workflow_dispatch:
 
 jobs:
-  hello:
+  hello-nuget:
     runs-on: ubuntu-latest
+    # environment: release # Use this when set in nuget
+
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
-      - name: Greetings
-        run: echo "Hello from Wiretap!"
+      - name: Checkout
+        uses: actions/checkout@v7
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+      
+      - name: Build
+        run: dotnet build ./Wiretap/Wiretap.csproj --configuration Release
 
-      - name: Show current directory
-        run: pwd
+      - name: Pack
+        run: |
+          dotnet pack ./Wiretap/Wiretap.csproj \
+          --configuration Release \
+          --no-build \
+          --output ./packages
+
+      - name: Authenticate with NuGet
+        id: nuget
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USERNAME }}
+
+      - name: Publish
+        run: |
+          dotnet nuget push "./packages/*.nupkg" \
+          --source "https://api.nuget.org/v3/index.json" \
+          --api-key "${{ steps.nuget.outputs.NUGET_API_KEY }}"
+
