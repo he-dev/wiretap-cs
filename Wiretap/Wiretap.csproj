@@ -11,7 +11,7 @@
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Wiretap</PackageId>
-    <Version>13.0.1</Version>
+    <Version>13.0.3</Version>
     <Authors>HeDev</Authors>
     <Company>HeDev</Company>
     <Description>Logging extensions to produce logs that are easier to organize.</Description>

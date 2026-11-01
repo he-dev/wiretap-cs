@@ -34,7 +34,7 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]).LogEnvelope(EnvelopeMode.LastOnly))
+    using (var scope = logger.BeginScopeAbout("example", [("loopCount", loopCount)]))
     {
         scope.Zero.System.LogInformation("Hello Wiretap!");
 

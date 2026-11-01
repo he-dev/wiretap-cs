@@ -52,8 +52,4 @@ public static class LoggerExtensions
         public ILogger System => new StoryLogger(logger, "System");
     }
 
-    extension(ActivityScope logger)
-    {
-        public ActivityScope LogEnvelope(EnvelopeMode mode = EnvelopeMode.Auto) => new EnvelopeLogger(logger, mode);
-    }
 }
