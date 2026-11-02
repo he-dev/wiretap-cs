@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Util;
@@ -15,12 +16,13 @@ public class ActivityLogger
 {
     protected override ILogger Logger => logger;
 
-    public override ILogger Zero => new EventLogger(this, ActivityEvent.Zero);
-    public override ILogger Tick => new EventLogger(this, ActivityEvent.Tick);
-    public override ILogger Last => new EventLogger(this, ActivityEvent.Last);
-    private ILogger LastFallback => new EventLogger(this, ActivityEvent.Last, ActivityEventMode.Fallback);
+    public override ILogger Zero => new ZeroLogger(this);
+    public override ILogger Tick => new TickLogger(this);
+    public override ILogger Last => new LastLogger(this);
 
-    private Activity Activity { get; } = activity;
+    internal Activity Activity { get; } = activity;
+    internal List<ActivityEvent> History { get; } = [];
+    internal bool InProgress { get; private set; } = true;
 
     private IDisposable? LoggerScope { get; } = loggerScope;
 
@@ -46,8 +48,6 @@ public class ActivityLogger
         return new ActivityLogger(logger, activity, scope);
     }
 
-    private ActivityEvent? RecentEvent { get; set; }
-
     public override IDisposable? BeginScope<TState>(TState state) => Logger.BeginScope(state);
 
     public override bool IsEnabled(LogLevel logLevel) => Logger.IsEnabled(logLevel);
@@ -56,11 +56,6 @@ public class ActivityLogger
     {
         if (IsEnabled(logLevel))
         {
-            using var durationScope =
-                RecentEvent is ActivityEvent.Last
-                    ? Logger.BeginScopeWith(("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds))
-                    : null;
-
             var parentId = Activity.ParentSpanId == default ? null : Activity.ParentSpanId.ToHexString();
             using var traceScope = Logger.BeginScopeWith
             (
@@ -73,89 +68,11 @@ public class ActivityLogger
         }
     }
 
-    internal Fixme? MoveNext(ActivityEvent next, LogLevel logLevel, ActivityEventMode mode)
-    {
-        switch (next, RecentEvent, mode)
-        {
-            // core: This is the very first zero, in either mode.
-            case (ActivityEvent.Zero, null, ActivityEventMode.Regular or ActivityEventMode.Fallback):
-                RecentEvent = next;
-                return new Fixme([]);
-
-            // core: This zero follows an existing event instead of starting the activity.
-            case (ActivityEvent.Zero, ActivityEvent.Zero or ActivityEvent.Tick or ActivityEvent.Last, ActivityEventMode.Regular or ActivityEventMode.Fallback):
-                RecentEvent = next;
-                return new Fixme(["zero-must-occur-only-once"]);
-
-            // core: This tick follows its sequence, in either mode.
-            case (ActivityEvent.Tick, ActivityEvent.Zero or ActivityEvent.Tick, ActivityEventMode.Regular or ActivityEventMode.Fallback):
-                RecentEvent = next;
-                return new Fixme([]);
-
-            // core: This tick has no preceding event or follows last, so it does not follow its sequence.
-            case (ActivityEvent.Tick, null or ActivityEvent.Last, ActivityEventMode.Regular or ActivityEventMode.Fallback):
-                RecentEvent = next;
-                return new Fixme(["tick-must-follow-zero-or-tick"]);
-
-            // core: This is the fallback-last, but there is one already. Ignore.
-            case (ActivityEvent.Last, ActivityEvent.Last, ActivityEventMode.Fallback):
-                return null;
-
-            // core: No last was logged explicitly. Emit the fallback-last with a fixme.
-            case (ActivityEvent.Last, null or ActivityEvent.Zero or ActivityEvent.Tick, ActivityEventMode.Fallback):
-                Complete(logLevel);
-                RecentEvent = next;
-                return new Fixme(["last-must-be-explicit"]);
-
-            // core: This explicit last follows its sequence.
-            case (ActivityEvent.Last, ActivityEvent.Zero or ActivityEvent.Tick, ActivityEventMode.Regular):
-                Complete(logLevel);
-                RecentEvent = next;
-                return new Fixme([]);
-
-            // core: This is another explicit last.
-            case (ActivityEvent.Last, ActivityEvent.Last, ActivityEventMode.Regular):
-                Complete(logLevel);
-                RecentEvent = next;
-                return new Fixme(["last-must-occur-only-once"]);
-
-            // core: This explicit last has no preceding zero or tick.
-            case (ActivityEvent.Last, null, ActivityEventMode.Regular):
-                Complete(logLevel);
-                RecentEvent = next;
-                return new Fixme(["last-must-follow-zero-or-tick"]);
-
-            // core: An event, state, or mode combination is missing from the cases above.
-            case var _:
-                throw new InvalidOperationException($"Unhandled activity transition: next={next}, recent={RecentEvent}, mode={mode}");
-        }
-    }
-
-    private void Complete(LogLevel logLevel)
-    {
-        Activity.SetEndTime(DateTime.UtcNow);
-        switch (logLevel)
-        {
-            case LogLevel.None:
-                // core: Leave the status as-is.
-                break;
-            case LogLevel.Trace:
-            case LogLevel.Debug:
-            case LogLevel.Information:
-            case LogLevel.Warning:
-                Activity.SetStatus(ActivityStatusCode.Ok);
-                break;
-            case LogLevel.Error:
-            case LogLevel.Critical:
-                Activity.SetStatus(ActivityStatusCode.Error);
-                break;
-        }
-    }
-
     public override void Dispose()
     {
-        // core: Request a fallback-last; the lifecycle skips it if last already occurred.
-        LastFallback.System.LogWarning(null);
+        // core: Mark scope closure before requesting last; the event skips redundant closure.
+        InProgress = false;
+        Last.System.LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();
