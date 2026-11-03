@@ -1,11 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
-using Wiretap.Core.Logging;
-using Wiretap.Core.Logging.Scopes;
-using Wiretap.Util;
+using Wiretap.Util.Logging;
+using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Core;
 
@@ -13,9 +11,14 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
+        public PropertyLogger With(params (string Name, object? Value)[] properties)
+        {
+            return PropertyLogger.With(logger, properties);
+        }
+
         public PropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
         {
-            return PropertyScope.FromParams(logger, properties);
+            return PropertyScope.With(logger, properties);
         }
 
         public ActivityScope BeginScopeAbout
@@ -25,7 +28,7 @@ public static class LoggerExtensions
             Action<Activity>? configure = null
         )
         {
-            return ActivityLogger.About(logger, about, properties, configure);
+            return ActivityScope.About(logger, about, properties, configure);
         }
 
         public ActivityScope BeginScopeAbout<TAbout>
@@ -48,8 +51,19 @@ public static class LoggerExtensions
             return ContinuationScope.About(logger, about, traceId, parentId, configure);
         }
 
-        public ILogger Domain => new StoryLogger(logger, "Domain");
-        public ILogger System => new StoryLogger(logger, "System");
+        public ILogger WithCallerInfo
+        (
+            [CallerMemberName] string member = "",
+            [CallerFilePath] string file = "",
+            [CallerLineNumber] int line = 0
+        )
+        {
+            return PropertyLogger.With(logger,
+            [
+                ("source.func", member),
+                ("source.file", file),
+                ("source.line", line),
+            ]);
+        }
     }
-
 }

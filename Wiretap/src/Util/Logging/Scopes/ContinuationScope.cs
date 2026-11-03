@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using ActivityEvent = Wiretap.Util.ActivityEvent;
+using Wiretap.Core;
 
-namespace Wiretap.Core.Logging.Scopes;
+namespace Wiretap.Util.Logging.Scopes;
 
 /// <summary>Establishes incoming trace context independently of activity event logging.</summary>
 internal sealed class ContinuationScope(Activity activity, IDisposable? scope) : IDisposable

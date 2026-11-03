@@ -3,63 +3,50 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
-using Wiretap.Core.Logging;
+using Wiretap.Util.Logging.Scopes;
 
-namespace Wiretap.Util;
+namespace Wiretap.Util.Logging;
 
-public abstract class EventLogger(ActivityLogger logger) : ILogger
+public abstract class EventLogger(ActivityScope scope, ActivityEvent activityEvent) : ILogger
 {
-    protected ActivityLogger Logger { get; } = logger;
-    protected Activity Activity => Logger.Activity;
-    protected List<ActivityEvent> History => Logger.History;
-    protected abstract ActivityEvent Event { get; }
+    protected ActivityScope Scope { get; } = scope;
 
     // core: Null skips the closing request; an empty array still represents an event to log.
     protected abstract (string Name, object? Value)[]? Log(LogLevel logLevel);
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Logger.BeginScope(state);
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Scope.BeginScope(state);
 
-    public bool IsEnabled(LogLevel logLevel) => Logger.IsEnabled(logLevel);
+    public bool IsEnabled(LogLevel logLevel) => Scope.IsEnabled(logLevel);
 
     public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        if (Log(logLevel) is not { } properties)
+        if (Log(logLevel) is { } properties)
         {
-            return;
+            // core: Record accepted events even when their log level is filtered out.
+            Scope.History.Add(activityEvent);
+
+            if (IsEnabled(logLevel))
+            {
+                Scope
+                    .With([("activity.event", activityEvent), .. properties])
+                    .Log(logLevel, eventId, state, exception, formatter);
+            }
         }
-
-        // core: Record accepted events even when their log level is filtered out.
-        History.Add(Event);
-
-        if (!IsEnabled(logLevel))
-        {
-            return;
-        }
-
-        using var scope = Logger.BeginScopeWith
-        ([
-            ("activity.event", Event),
-            .. properties
-        ]);
-
-        Logger.Log(logLevel, eventId, state, exception, formatter);
     }
 }
 
-public sealed class ZeroLogger(ActivityLogger logger) : EventLogger(logger)
+public sealed class ZeroLogger(ActivityScope scope) : EventLogger(scope, ActivityEvent.Zero)
 {
-    protected override ActivityEvent Event => ActivityEvent.Zero;
-
     protected override (string Name, object? Value)[]? Log(LogLevel logLevel)
     {
         // core: After last, report only that the activity has already ended.
-        if (History.Contains(ActivityEvent.Last))
+        if (Scope.History.Contains(ActivityEvent.Last))
         {
             return [("fixme", new[] { "no-events-must-follow-last" })];
         }
 
         // core: Otherwise, attach the duplicate-zero diagnostic to this zero.
-        if (History.Contains(ActivityEvent.Zero))
+        if (Scope.History.Contains(ActivityEvent.Zero))
         {
             return [("fixme", new[] { "zero-occurs-more-than-once" })];
         }
@@ -68,14 +55,12 @@ public sealed class ZeroLogger(ActivityLogger logger) : EventLogger(logger)
     }
 }
 
-public sealed class TickLogger(ActivityLogger logger) : EventLogger(logger)
+public sealed class TickLogger(ActivityScope scope) : EventLogger(scope, ActivityEvent.Tick)
 {
-    protected override ActivityEvent Event => ActivityEvent.Tick;
-
     protected override (string Name, object? Value)[]? Log(LogLevel logLevel)
     {
         // core: Ticks are unrestricted until the activity has ended.
-        if (History.Contains(ActivityEvent.Last))
+        if (Scope.History.Contains(ActivityEvent.Last))
         {
             return [("fixme", new[] { "no-events-must-follow-last" })];
         }
@@ -84,39 +69,41 @@ public sealed class TickLogger(ActivityLogger logger) : EventLogger(logger)
     }
 }
 
-public sealed class LastLogger(ActivityLogger logger) : EventLogger(logger)
+public sealed class LastLogger(ActivityScope scope, bool once = false) : EventLogger(scope, ActivityEvent.Last)
 {
-    protected override ActivityEvent Event => ActivityEvent.Last;
+    public LastLogger Once => once ? this : new LastLogger(Scope, once: true);
 
     protected override (string Name, object? Value)[]? Log(LogLevel logLevel)
     {
-        if (History.Contains(ActivityEvent.Last))
+        if (Scope.History.Contains(ActivityEvent.Last))
         {
             // core: Scope closure does not add another last if one already occurred.
-            if (!Logger.InProgress)
+            if (once)
             {
                 return null;
             }
 
             // core: A repeated explicit last preserves the first last's duration and status.
-            return [
-                ("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds),
+            return
+            [
+                ("activity.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds),
                 ("fixme", new[] { "no-events-must-follow-last" })
             ];
         }
 
         // core: Only the first last reports omissions and captures the activity's duration.
         var aboutMe = new List<string>();
-        if (!History.Contains(ActivityEvent.Zero))
+        if (!Scope.History.Contains(ActivityEvent.Zero))
         {
             aboutMe.Add("does-not-log-zero");
         }
-        if (!Logger.InProgress)
+
+        if (once)
         {
-            aboutMe.Add("does-not-log-last");
+            aboutMe.Add("logs-last-silently");
         }
 
-        Activity.SetEndTime(DateTime.UtcNow);
+        Scope.Activity.SetEndTime(DateTime.UtcNow);
         switch (logLevel)
         {
             case LogLevel.None:
@@ -126,16 +113,17 @@ public sealed class LastLogger(ActivityLogger logger) : EventLogger(logger)
             case LogLevel.Debug:
             case LogLevel.Information:
             case LogLevel.Warning:
-                Activity.SetStatus(ActivityStatusCode.Ok);
+                Scope.Activity.SetStatus(ActivityStatusCode.Ok);
                 break;
             case LogLevel.Error:
             case LogLevel.Critical:
-                Activity.SetStatus(ActivityStatusCode.Error);
+                Scope.Activity.SetStatus(ActivityStatusCode.Error);
                 break;
         }
 
-        return [
-            ("activity.duration_ms", (long)Activity.Duration.TotalMilliseconds),
+        return
+        [
+            ("activity.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds),
             ("aboutme", aboutMe.ToArray())
         ];
     }

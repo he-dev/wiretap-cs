@@ -2,31 +2,27 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Wiretap.Util;
-using ActivityEvent = Wiretap.Util.ActivityEvent;
+using Wiretap.Core;
 
-namespace Wiretap.Core.Logging;
+namespace Wiretap.Util.Logging.Scopes;
 
-public class ActivityLogger
+public sealed class ActivityScope
 (
     ILogger logger,
     Activity activity,
     IDisposable? loggerScope
-) : ActivityScope
+) : ILogger, IDisposable
 {
-    protected override ILogger Logger => logger;
-
-    public override ILogger Zero => new ZeroLogger(this);
-    public override ILogger Tick => new TickLogger(this);
-    public override ILogger Last => new LastLogger(this);
+    public ZeroLogger Zero => new ZeroLogger(this);
+    public TickLogger Tick => new TickLogger(this);
+    public LastLogger Last => new LastLogger(this);
 
     internal Activity Activity { get; } = activity;
     internal List<ActivityEvent> History { get; } = [];
-    internal bool InProgress { get; private set; } = true;
 
     private IDisposable? LoggerScope { get; } = loggerScope;
 
-    public static ActivityLogger About
+    public static ActivityScope About
     (
         ILogger logger,
         string about,
@@ -45,34 +41,32 @@ public class ActivityLogger
             ("activity.event", ActivityEvent.Tick),
             .. properties ?? []
         ]);
-        return new ActivityLogger(logger, activity, scope);
+        return new ActivityScope(logger, activity, scope);
     }
 
-    public override IDisposable? BeginScope<TState>(TState state) => Logger.BeginScope(state);
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
 
-    public override bool IsEnabled(LogLevel logLevel) => Logger.IsEnabled(logLevel);
+    public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
-    public override void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
         if (IsEnabled(logLevel))
         {
             var parentId = Activity.ParentSpanId == default ? null : Activity.ParentSpanId.ToHexString();
-            using var traceScope = Logger.BeginScopeWith
+            using var traceScope = logger.BeginScopeWith
             (
                 ("trace.id", Activity.TraceId.ToHexString()),
                 ("trace.span_id", Activity.SpanId.ToHexString()),
                 ("trace.parent_id", parentId)
             );
 
-            Logger.Log(logLevel, eventId, state, exception, formatter);
+            logger.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 
-    public override void Dispose()
+    public void Dispose()
     {
-        // core: Mark scope closure before requesting last; the event skips redundant closure.
-        InProgress = false;
-        Last.System.LogWarning(null);
+        Last.Once.With(Story.System).LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();

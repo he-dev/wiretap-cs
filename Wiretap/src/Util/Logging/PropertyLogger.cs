@@ -3,12 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
-namespace Wiretap.Core.Logging;
+namespace Wiretap.Util.Logging;
 
-public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] properties) : ILogger, IDisposable
+public class PropertyLogger(ILogger logger, KeyValuePair<string, object?>[] properties) : ILogger
 {
-    private IDisposable? Scope { get; } = logger.BeginScope(properties);
-
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
 
     public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
@@ -17,15 +15,14 @@ public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] prope
     {
         if (IsEnabled(logLevel))
         {
+            using var scope = BeginScope(properties);
             logger.Log(logLevel, eventId, state, exception, formatter);
         }
     }
 
-    public void Dispose() => Scope?.Dispose();
-
-    public static PropertyScope FromParams(ILogger logger, (string Name, object? Value)[] properties)
+    public static PropertyLogger With(ILogger logger, (string Name, object? Value)[] properties)
     {
         var keyValuePairs = properties.Select(p => new KeyValuePair<string, object?>(p.Name, p.Value)).ToArray();
-        return new PropertyScope(logger, keyValuePairs);
+        return new PropertyLogger(logger, keyValuePairs);
     }
 }
