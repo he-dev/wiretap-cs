@@ -29,7 +29,7 @@ Typical logging conventions that log bare messages like `logging.info(...)` have
 - Plot events are `ZERO`, `TICK`, and `LAST`.
 - Stories are `Story.Core` and `Story.Buzz`, replacing `Domain` and `System` respectively. The telemetry key is `plot.story`.
 - `SNAP` is a free event emitted through `logger.Snap(about, story)`.
-- `BEEP` reports framework findings with `Story.Buzz` and `context.error_code`. Invalid sequences use Error and remarks use Debug. Enabled finding codes are emitted once per plot and do not enter lifecycle history.
+- `BEEP` reports framework findings with `Story.Buzz` and `context.beep_code`. Invalid sequences use Error and remarks use Debug. Enabled finding codes are emitted once per plot and do not enter lifecycle history.
 
 The following symbolic example shows the field names and possible values.
 

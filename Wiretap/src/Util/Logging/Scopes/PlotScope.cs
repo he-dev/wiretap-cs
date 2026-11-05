@@ -25,9 +25,9 @@ public sealed class PlotScope
     private IDisposable? LoggerScope { get; } = loggerScope;
     private HashSet<string> Beeps { get; } = [];
 
-    public void Beep(LogLevel logLevel, string errorCode, [StructuredMessageTemplate] string? message, params object?[] args)
+    public void Beep(LogLevel logLevel, string beepCode, [StructuredMessageTemplate] string? message, params object?[] args)
     {
-        if (IsEnabled(logLevel) && Beeps.Add(errorCode))
+        if (IsEnabled(logLevel) && Beeps.Add(beepCode))
         {
             this
                 .With
@@ -35,7 +35,7 @@ public sealed class PlotScope
                     ("plot.about", Activity.OperationName),
                     ("plot.event", PlotEvent.Beep),
                     ("plot.story", Story.Buzz.Value),
-                    ("context.error_code", errorCode)
+                    ("context.beep_code", beepCode)
                 )
                 .Log(logLevel, message, args);
         }

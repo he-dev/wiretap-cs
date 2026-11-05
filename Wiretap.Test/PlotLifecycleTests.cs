@@ -97,7 +97,7 @@ public class PlotLifecycleTests
                 .ToArray();
             if (properties.LastOrDefault(property => property.Key == "plot.event").Value is PlotEvent.Beep)
             {
-                Diagnostics.Add((string)properties.Last(property => property.Key == "context.error_code").Value!);
+                Diagnostics.Add((string)properties.Last(property => property.Key == "context.beep_code").Value!);
             }
         }
 
