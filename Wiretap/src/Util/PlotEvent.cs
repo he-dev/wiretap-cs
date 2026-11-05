@@ -1,8 +1,10 @@
 ﻿namespace Wiretap.Util;
 
-public enum ActivityEvent
+public enum PlotEvent
 {
     Zero,
     Tick,
     Last,
+    Snap,
+    Beep,
 }

@@ -5,7 +5,7 @@ using Wiretap.Core;
 
 namespace Wiretap.Util.Logging.Scopes;
 
-/// <summary>Establishes incoming trace context independently of activity event logging.</summary>
+/// <summary>Establishes incoming trace context independently of plot event logging.</summary>
 internal sealed class ContinuationScope(Activity activity, IDisposable? scope) : IDisposable
 {
     private Activity Activity { get; } = activity;
@@ -31,11 +31,11 @@ internal sealed class ContinuationScope(Activity activity, IDisposable? scope) :
 
         var activity = CreateActivity(about, traceId, parentId, configure);
 
-        // core: Ordinary activity scopes inherit this context through Activity.Current.
+        // core: Ordinary plot scopes inherit this context through Activity.Current.
         var scope = logger.BeginScopeWith
         (
-            ("activity.about", about),
-            ("activity.event", ActivityEvent.Tick),
+            ("plot.about", about),
+            ("plot.event", PlotEvent.Tick),
             ("trace.id", activity.TraceId.ToHexString()),
             ("trace.span_id", activity.SpanId.ToHexString()),
             ("trace.parent_id", activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString())

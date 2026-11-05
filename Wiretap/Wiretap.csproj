@@ -11,7 +11,7 @@
     <IsPackable>true</IsPackable>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Wiretap</PackageId>
-    <Version>13.0.3</Version>
+    <Version>13.0.4</Version>
     <Authors>HeDev</Authors>
     <Company>HeDev</Company>
     <Description>Logging extensions to produce logs that are easier to organize.</Description>
@@ -31,6 +31,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403">
       <PrivateAssets>all</PrivateAssets>

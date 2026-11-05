@@ -1,12 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
+using Wiretap.Util.Logging.Events;
 
 namespace Wiretap.Util.Logging.Scopes;
 
-public sealed class ActivityScope
+public sealed class PlotScope
 (
     ILogger logger,
     Activity activity,
@@ -18,14 +20,32 @@ public sealed class ActivityScope
     public LastLogger Last => new LastLogger(this);
 
     internal Activity Activity { get; } = activity;
-    internal List<ActivityEvent> History { get; } = [];
+    internal List<PlotEvent> History { get; } = [];
 
     private IDisposable? LoggerScope { get; } = loggerScope;
+    private HashSet<string> Beeps { get; } = [];
 
-    public static ActivityScope About
+    public void Beep(LogLevel logLevel, string errorCode, [StructuredMessageTemplate] string? message, params object?[] args)
+    {
+        if (IsEnabled(logLevel) && Beeps.Add(errorCode))
+        {
+            this
+                .With
+                (
+                    ("plot.about", Activity.OperationName),
+                    ("plot.event", PlotEvent.Beep),
+                    ("plot.story", Story.Buzz.Value),
+                    ("context.error_code", errorCode)
+                )
+                .Log(logLevel, message, args);
+        }
+    }
+
+    public static PlotScope About
     (
         ILogger logger,
         string about,
+        Story story,
         (string Name, object? Value)[]? properties = null,
         Action<Activity>? configure = null
     )
@@ -36,12 +56,13 @@ public sealed class ActivityScope
 
         var scope = logger.BeginScopeWith
         ([
-            ("activity.about", about),
+            ("plot.about", about),
+            ("plot.story", story.Value),
             // core: Apply tick-event by default; explicit events are validated independently of trace activation.
-            ("activity.event", ActivityEvent.Tick),
+            ("plot.event", PlotEvent.Tick),
             .. properties ?? []
         ]);
-        return new ActivityScope(logger, activity, scope);
+        return new PlotScope(logger, activity, scope);
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
@@ -66,7 +87,7 @@ public sealed class ActivityScope
 
     public void Dispose()
     {
-        Last.Once.With(Story.System).LogWarning(null);
+        Last.Once.With(Story.Buzz).LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();

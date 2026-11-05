@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using Wiretap.Util.Logging;
+using Wiretap.Util.Logging.Events;
 using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Core;
@@ -11,6 +12,11 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
+        public SnapLogger Snap(string about, Story story)
+        {
+            return new SnapLogger(logger, about, story);
+        }
+
         public PropertyLogger With(params (string Name, object? Value)[] properties)
         {
             return PropertyLogger.With(logger, properties);
@@ -21,26 +27,28 @@ public static class LoggerExtensions
             return PropertyScope.With(logger, properties);
         }
 
-        public ActivityScope BeginScopeAbout
+        public PlotScope BeginPlotAbout
         (
             string about,
+            Story story,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return ActivityScope.About(logger, about, properties, configure);
+            return PlotScope.About(logger, about, story, properties, configure);
         }
 
-        public ActivityScope BeginScopeAbout<TAbout>
+        public PlotScope BeginPlotAbout<TAbout>
         (
+            Story story,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure);
+            return logger.BeginPlotAbout(typeof(TAbout).Name, story, properties, configure);
         }
 
-        public IDisposable ContinueScopeAbout
+        public IDisposable ContinuePlotAbout
         (
             string about,
             string traceId,

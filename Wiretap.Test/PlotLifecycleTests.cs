@@ -1,49 +1,50 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
+using Wiretap.Util;
 
 namespace Wiretap.Test;
 
-public class ActivityLifecycleTests
+public class PlotLifecycleTests
 {
     [Theory]
-    [InlineData("", "last-must-be-explicit")]
-    [InlineData("zero", "|last-must-be-explicit")]
-    [InlineData("zero,tick,last", "||")]
-    [InlineData("last", "last-must-follow-zero-or-tick")]
-    [InlineData("tick,tick,last", "tick-must-follow-zero-or-tick||")]
-    [InlineData("zero,zero,last", "|zero-must-occur-only-once|")]
-    [InlineData("zero,last,last", "||last-must-occur-only-once")]
-    [InlineData("zero,last,tick,last", "||tick-must-follow-zero-or-tick|")]
+    [InlineData("", "")]
+    [InlineData("zero", "")]
+    [InlineData("zero,tick,last", "")]
+    [InlineData("last", "")]
+    [InlineData("tick,tick,last", "")]
+    [InlineData("zero,zero,last", "zero-occurs-more-than-once")]
+    [InlineData("zero,last,last", "no-events-must-follow-last")]
+    [InlineData("zero,last,tick,last", "no-events-must-follow-last")]
     public void LogsExpectedDiagnosticsAndSuppressesCompletedFallback(string events, string expected)
     {
         var logger = new CaptureLogger();
-        using (var activity = logger.BeginScopeAbout("test"))
+        using (var plot = logger.BeginPlotAbout("test", Story.Core))
         {
             foreach (var name in events.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
-                var target = name switch
+                ILogger target = name switch
                 {
-                    "zero" => activity.Zero,
-                    "tick" => activity.Tick,
-                    "last" => activity.Last,
+                    "zero" => plot.Zero,
+                    "tick" => plot.Tick,
+                    "last" => plot.Last,
                     _ => throw new ArgumentException(name)
                 };
                 target.LogInformation("event");
             }
         }
 
-        Assert.Equal(expected.Split('|'), logger.Diagnostics);
+        Assert.Equal(expected.Split('|', StringSplitOptions.RemoveEmptyEntries), logger.Diagnostics);
     }
 
     [Fact]
     public void FilteredEventsStillAdvanceLifecycle()
     {
         var logger = new CaptureLogger();
-        using (var activity = logger.BeginScopeAbout("filtered"))
+        using (var plot = logger.BeginPlotAbout("filtered", Story.Core))
         {
-            activity.Zero.LogDebug("start");
-            activity.Last.LogDebug("end");
+            plot.Zero.LogDebug("start");
+            plot.Last.LogDebug("end");
         }
 
         Assert.Empty(logger.Diagnostics);
@@ -56,21 +57,21 @@ public class ActivityLifecycleTests
     {
         var logger = new CaptureLogger();
         Activity? captured = null;
-        var activity = logger.BeginScopeAbout("status", configure: value => captured = value);
+        var plot = logger.BeginPlotAbout("status", Story.Core, configure: value => captured = value);
         try
         {
-            activity.Zero.LogInformation("start");
+            plot.Zero.LogInformation("start");
             if (error)
-                activity.Last.LogError("failed");
+                plot.Last.LogError("failed");
             else
-                activity.Last.LogInformation("done");
+                plot.Last.LogInformation("done");
 
             Assert.Equal(expected, captured!.Status);
         }
         finally
         {
             var duration = captured!.Duration;
-            activity.Dispose();
+            plot.Dispose();
             Assert.Equal(duration, captured.Duration);
             Assert.Equal(expected, captured.Status);
         }
@@ -91,11 +92,13 @@ public class ActivityLifecycleTests
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
-            var constraints = scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>()
+            var properties = scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>()
                 .SelectMany(properties => properties)
-                .Where(property => property.Key == "fixme")
-                .SelectMany(property => (string[])property.Value!);
-            Diagnostics.Add(string.Join(",", constraints));
+                .ToArray();
+            if (properties.LastOrDefault(property => property.Key == "plot.event").Value is PlotEvent.Beep)
+            {
+                Diagnostics.Add((string)properties.Last(property => property.Key == "context.error_code").Value!);
+            }
         }
 
         private sealed class Scope(Action dispose) : IDisposable
