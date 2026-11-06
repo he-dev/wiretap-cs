@@ -5,16 +5,16 @@ using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Util.Logging.Events;
 
-public sealed class LastLogger(PlotScope scope, bool once = false) : EventLogger(scope, PlotEvent.Last)
+public sealed class LastLogger(PlotScope scope, bool whenFirstOnly = false) : EventLogger(scope, PlotEvent.Last)
 {
-    public LastLogger Once => once ? this : new LastLogger(Scope, once: true);
+    public LastLogger WhenFirstOnly => whenFirstOnly ? this : new LastLogger(Scope, whenFirstOnly: true);
 
     protected override (string Name, object? Value)[]? Log(LogLevel logLevel)
     {
         if (Scope.History.Contains(PlotEvent.Last))
         {
             // core: Scope closure does not add another last if one already occurred.
-            if (once)
+            if (whenFirstOnly)
             {
                 return null;
             }
@@ -34,7 +34,7 @@ public sealed class LastLogger(PlotScope scope, bool once = false) : EventLogger
             Scope.Beep(LogLevel.Debug, "does-not-log-zero", "Plot {plot.about} reaches LAST without ZERO.");
         }
 
-        if (once)
+        if (whenFirstOnly)
         {
             Scope.Beep(LogLevel.Debug, "logs-last-silently", "Plot {plot.about} ends without an explicit LAST.");
         }

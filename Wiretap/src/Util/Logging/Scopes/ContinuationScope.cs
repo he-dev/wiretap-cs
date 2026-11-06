@@ -35,7 +35,6 @@ internal sealed class ContinuationScope(Activity activity, IDisposable? scope) :
         var scope = logger.BeginScopeWith
         (
             ("plot.about", about),
-            ("plot.event", PlotEvent.Tick),
             ("trace.id", activity.TraceId.ToHexString()),
             ("trace.span_id", activity.SpanId.ToHexString()),
             ("trace.parent_id", activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString())

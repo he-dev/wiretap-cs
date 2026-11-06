@@ -27,7 +27,7 @@ public static class LoggerExtensions
             return PropertyScope.With(logger, properties);
         }
 
-        public PlotScope BeginPlotAbout
+        public PlotScope BeginPlot
         (
             string about,
             Story story,
@@ -38,17 +38,17 @@ public static class LoggerExtensions
             return PlotScope.About(logger, about, story, properties, configure);
         }
 
-        public PlotScope BeginPlotAbout<TAbout>
+        public PlotScope BeginPlot<TAbout>
         (
             Story story,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return logger.BeginPlotAbout(typeof(TAbout).Name, story, properties, configure);
+            return logger.BeginPlot(typeof(TAbout).Name, story, properties, configure);
         }
 
-        public IDisposable ContinuePlotAbout
+        public IDisposable ContinuePlot
         (
             string about,
             string traceId,

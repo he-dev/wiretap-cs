@@ -19,7 +19,7 @@ public class PlotLifecycleTests
     public void LogsExpectedDiagnosticsAndSuppressesCompletedFallback(string events, string expected)
     {
         var logger = new CaptureLogger();
-        using (var plot = logger.BeginPlotAbout("test", Story.Core))
+        using (var plot = logger.BeginPlot("test", Story.Core))
         {
             foreach (var name in events.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -41,7 +41,7 @@ public class PlotLifecycleTests
     public void FilteredEventsStillAdvanceLifecycle()
     {
         var logger = new CaptureLogger();
-        using (var plot = logger.BeginPlotAbout("filtered", Story.Core))
+        using (var plot = logger.BeginPlot("filtered", Story.Core))
         {
             plot.Zero.LogDebug("start");
             plot.Last.LogDebug("end");
@@ -57,7 +57,7 @@ public class PlotLifecycleTests
     {
         var logger = new CaptureLogger();
         Activity? captured = null;
-        var plot = logger.BeginPlotAbout("status", Story.Core, configure: value => captured = value);
+        var plot = logger.BeginPlot("status", Story.Core, configure: value => captured = value);
         try
         {
             plot.Zero.LogInformation("start");

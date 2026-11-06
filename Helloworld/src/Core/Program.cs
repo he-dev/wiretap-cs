@@ -34,7 +34,7 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginPlotAbout("example", Story.Core, [("loopCount", loopCount)]))
+    using (var scope = logger.BeginPlot("example", Story.Core, [("loopCount", loopCount)]))
     {
         scope.Zero.With(Story.Buzz).LogInformation("Hello Wiretap!");
         scope.Zero.With(Story.Buzz).LogInformation("One ZERO to many!");

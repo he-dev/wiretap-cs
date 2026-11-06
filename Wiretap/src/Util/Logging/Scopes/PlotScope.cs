@@ -87,7 +87,7 @@ public sealed class PlotScope
 
     public void Dispose()
     {
-        Last.Once.With(Story.Buzz).LogWarning(null);
+        Last.WhenFirstOnly.With(Story.Buzz).LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();
