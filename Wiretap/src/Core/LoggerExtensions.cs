@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using Wiretap.Util;
 using Wiretap.Util.Logging;
 using Wiretap.Util.Logging.Events;
 using Wiretap.Util.Logging.Scopes;
@@ -16,6 +17,8 @@ public static class LoggerExtensions
         {
             return new SnapLogger(logger, about, channel);
         }
+
+        public SnapLogger Snap<TAbout>(Channel channel) => logger.Snap(typeof(TAbout).Name, channel);
 
         public PropertyLogger With(params (string Name, object? Value)[] properties)
         {

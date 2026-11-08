@@ -34,8 +34,8 @@ public sealed class ActivityScope
                 (
                     ("activity.about", Activity.OperationName),
                     ("activity.event", ActivityEvent.Beep),
-                    ("activity.channel", Channel.Internal.Value),
-                    ("context.beep_code", beepCode)
+                    Channel.Internal,
+                    ("beep_code", beepCode)
                 )
                 .Log(logLevel, message, args);
         }
@@ -57,9 +57,9 @@ public sealed class ActivityScope
         var scope = logger.BeginScopeWith
         ([
             ("activity.about", about),
-            ("activity.channel", channel.Value),
             // core: Apply tick-event by default; explicit events are validated independently of trace activation.
             ("activity.event", ActivityEvent.Tick),
+            channel,
             .. properties ?? []
         ]);
         return new ActivityScope(logger, activity, scope);

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
+using Wiretap.Util;
 using ActivityEvent = Wiretap.Util.ActivityEvent;
 
 namespace Wiretap.Test;

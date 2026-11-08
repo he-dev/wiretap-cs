@@ -9,17 +9,17 @@ public sealed class ZeroLogger(ActivityScope scope) : EventLogger(scope, Activit
     {
         if (Scope.History.Contains(ActivityEvent.Last))
         {
-            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Activity {activity.about} logs ZEROs that follow LAST.");
+            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Activity '{activity.about}' logs ZEROs that follow LAST.");
         }
 
         if (Scope.History.Contains(ActivityEvent.Zero))
         {
-            Scope.Beep(LogLevel.Error, "zero-occurs-more-than-once", "Activity {activity.about} logs ZERO more than once.");
+            Scope.Beep(LogLevel.Error, "zero-occurs-more-than-once", "Activity '{activity.about}' logs ZERO more than once.");
         }
 
         if (Scope.History.Contains(ActivityEvent.Tick))
         {
-            Scope.Beep(LogLevel.Error, "zero-must-precede-tick", "Activity {activity.about} logs ZEROs that follow TICK.");
+            Scope.Beep(LogLevel.Error, "zero-must-precede-tick", "Activity '{activity.about}' logs ZEROs that follow TICK.");
         }
 
         return [];

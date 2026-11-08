@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using Wiretap.Core;
+using Wiretap.Core.Data;
 using Wiretap.Util;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -19,7 +19,7 @@ public sealed class LastLogger(ActivityScope scope, bool whenFirstOnly = false) 
                 return null;
             }
 
-            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Activity {activity.about} logs more than one LAST.");
+            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Activity '{activity.about}' logs more than one LAST.");
 
             // core: A repeated explicit last preserves the first last's duration and status.
             return
@@ -31,12 +31,12 @@ public sealed class LastLogger(ActivityScope scope, bool whenFirstOnly = false) 
         // core: Only the first last reports omissions and captures the activity's duration.
         if (!Scope.History.Contains(ActivityEvent.Zero))
         {
-            Scope.Beep(LogLevel.Debug, "does-not-log-zero", "Activity {activity.about} reaches LAST without ZERO.");
+            Scope.Beep(LogLevel.Debug, "does-not-log-zero", "Activity '{activity.about}' reaches LAST without ZERO.");
         }
 
         if (whenFirstOnly)
         {
-            Scope.Beep(LogLevel.Debug, "logs-last-silently", "Activity {activity.about} ends without an explicit LAST.");
+            Scope.Beep(LogLevel.Debug, "logs-last-silently", "Activity '{activity.about}' ends without an explicit LAST.");
         }
 
         Scope.Activity.SetEndTime(DateTime.UtcNow);
