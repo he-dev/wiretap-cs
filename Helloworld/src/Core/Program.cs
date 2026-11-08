@@ -1,4 +1,3 @@
-using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -6,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using Serilog;
 using Wiretap.Core;
 using Wiretap.Core.Data;
-using Wiretap.Util;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,10 +33,10 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginScopeAbout("example", Channel.Official, [("loopCount", loopCount)]))
+    using (var scope = logger.Official.BeginScopeAbout("example", [("loopCount", loopCount)]))
     {
-        scope.Zero.With(Channel.Internal).LogInformation("Hello Wiretap!");
-        scope.Zero.With(Channel.Internal).LogInformation("One ZERO to many!");
+        scope.Zero.LogInformation("Hello Wiretap!");
+        scope.Zero.Internal.LogInformation("One ZERO to many!");
 
         var stats = new Benchmark();
         foreach (var found in new[] { true, false, true })
@@ -49,7 +47,7 @@ using (var services = app.Services.CreateScope())
             sample.CountAs(found ? "found" : "not-found");
         }
 
-        scope.Tick.With(Channel.Internal).LogInformation(
+        scope.Tick.Internal.LogInformation(
             "Processed {FilesTotal} files at {FilesPerSecond:F2}/s; found {FilesFound}, not found {FilesNotFound}, found rate {FoundRate:P0}.",
             stats.Total.Count,
             stats.Total.ThroughputMs * 1000,
@@ -58,7 +56,7 @@ using (var services = app.Services.CreateScope())
             stats.Ratio("found"));
     }
 
-    logger.Snap("DoesEnd", Channel.Internal).LogInformation(null);
+    logger.Snap("DoesEnd").Official.LogInformation(null);
 }
 
 //app.MapGet("/", () => "Hello Wiretap!");

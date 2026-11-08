@@ -34,9 +34,9 @@ public sealed class ActivityScope
                 (
                     ("activity.about", Activity.OperationName),
                     ("activity.event", ActivityEvent.Beep),
-                    Channel.Internal,
                     ("beep_code", beepCode)
                 )
+                .Internal
                 .Log(logLevel, message, args);
         }
     }
@@ -45,7 +45,6 @@ public sealed class ActivityScope
     (
         ILogger logger,
         string about,
-        Channel channel,
         (string Name, object? Value)[]? properties = null,
         Action<Activity>? configure = null
     )
@@ -59,13 +58,15 @@ public sealed class ActivityScope
             ("activity.about", about),
             // core: Apply tick-event by default; explicit events are validated independently of trace activation.
             ("activity.event", ActivityEvent.Tick),
-            channel,
             .. properties ?? []
         ]);
         return new ActivityScope(logger, activity, scope);
     }
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+    {
+        return logger.BeginScope(state);
+    }
 
     public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 
@@ -87,7 +88,7 @@ public sealed class ActivityScope
 
     public void Dispose()
     {
-        Last.WhenFirstOnly.With(Channel.Internal).LogWarning(null);
+        Last.WhenFirstOnly.Internal.LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();

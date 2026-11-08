@@ -12,7 +12,10 @@ public abstract class EventLogger(ActivityScope scope, ActivityEvent activityEve
     // core: Null skips the closing request; an empty array still represents an event to log.
     protected abstract (string Name, object? Value)[]? Log(LogLevel logLevel);
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => Scope.BeginScope(state);
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+    {
+        return Scope.BeginScope(state);
+    }
 
     public bool IsEnabled(LogLevel logLevel) => Scope.IsEnabled(logLevel);
 

@@ -9,7 +9,10 @@ public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] prope
 {
     private IDisposable? Scope { get; } = logger.BeginScope(properties);
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+    {
+        return logger.BeginScope(state);
+    }
 
     public bool IsEnabled(LogLevel logLevel) => logger.IsEnabled(logLevel);
 

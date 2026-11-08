@@ -13,17 +13,21 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
-        public SnapLogger Snap(string about, Channel channel)
+        public SnapLogger Snap(string about)
         {
-            return new SnapLogger(logger, about, channel);
+            return new SnapLogger(logger, about);
         }
 
-        public SnapLogger Snap<TAbout>(Channel channel) => logger.Snap(typeof(TAbout).Name, channel);
+        public SnapLogger Snap<TAbout>() => logger.Snap(typeof(TAbout).Name);
 
         public PropertyLogger With(params (string Name, object? Value)[] properties)
         {
             return PropertyLogger.With(logger, properties);
         }
+
+        public PropertyLogger Official => logger.With(("activity.channel", "official"));
+
+        public PropertyLogger Internal => logger.With(("activity.channel", "internal"));
 
         public PropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
         {
@@ -33,22 +37,20 @@ public static class LoggerExtensions
         public ActivityScope BeginScopeAbout
         (
             string about,
-            Channel channel,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return ActivityScope.About(logger, about, channel, properties, configure);
+            return ActivityScope.About(logger, about, properties, configure);
         }
 
         public ActivityScope BeginScopeAbout<TAbout>
         (
-            Channel channel,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return logger.BeginScopeAbout(typeof(TAbout).Name, channel, properties, configure);
+            return logger.BeginScopeAbout(typeof(TAbout).Name, properties, configure);
         }
 
         public IDisposable ContinueScopeAbout
