@@ -5,9 +5,9 @@ using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Util.Logging;
 
-public abstract class EventLogger(PlotScope scope, PlotEvent plotEvent) : ILogger
+public abstract class EventLogger(ActivityScope scope, ActivityEvent activityEvent) : ILogger
 {
-    protected PlotScope Scope { get; } = scope;
+    protected ActivityScope Scope { get; } = scope;
 
     // core: Null skips the closing request; an empty array still represents an event to log.
     protected abstract (string Name, object? Value)[]? Log(LogLevel logLevel);
@@ -21,12 +21,12 @@ public abstract class EventLogger(PlotScope scope, PlotEvent plotEvent) : ILogge
         if (Log(logLevel) is { } properties)
         {
             // core: Record accepted events even when their log level is filtered out.
-            Scope.History.Add(plotEvent);
+            Scope.History.Add(activityEvent);
 
             if (IsEnabled(logLevel))
             {
                 Scope
-                    .With([("plot.event", plotEvent), .. properties])
+                    .With([("activity.event", activityEvent), .. properties])
                     .Log(logLevel, eventId, state, exception, formatter);
             }
         }

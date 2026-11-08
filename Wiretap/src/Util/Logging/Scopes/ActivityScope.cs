@@ -8,7 +8,7 @@ using Wiretap.Util.Logging.Events;
 
 namespace Wiretap.Util.Logging.Scopes;
 
-public sealed class PlotScope
+public sealed class ActivityScope
 (
     ILogger logger,
     Activity activity,
@@ -20,7 +20,7 @@ public sealed class PlotScope
     public LastLogger Last => new LastLogger(this);
 
     internal Activity Activity { get; } = activity;
-    internal List<PlotEvent> History { get; } = [];
+    internal List<ActivityEvent> History { get; } = [];
 
     private IDisposable? LoggerScope { get; } = loggerScope;
     private HashSet<string> Beeps { get; } = [];
@@ -32,20 +32,20 @@ public sealed class PlotScope
             this
                 .With
                 (
-                    ("plot.about", Activity.OperationName),
-                    ("plot.event", PlotEvent.Beep),
-                    ("plot.story", Story.Buzz.Value),
+                    ("activity.about", Activity.OperationName),
+                    ("activity.event", ActivityEvent.Beep),
+                    ("activity.channel", Channel.Internal.Value),
                     ("context.beep_code", beepCode)
                 )
                 .Log(logLevel, message, args);
         }
     }
 
-    public static PlotScope About
+    public static ActivityScope About
     (
         ILogger logger,
         string about,
-        Story story,
+        Channel channel,
         (string Name, object? Value)[]? properties = null,
         Action<Activity>? configure = null
     )
@@ -56,13 +56,13 @@ public sealed class PlotScope
 
         var scope = logger.BeginScopeWith
         ([
-            ("plot.about", about),
-            ("plot.story", story.Value),
+            ("activity.about", about),
+            ("activity.channel", channel.Value),
             // core: Apply tick-event by default; explicit events are validated independently of trace activation.
-            ("plot.event", PlotEvent.Tick),
+            ("activity.event", ActivityEvent.Tick),
             .. properties ?? []
         ]);
-        return new PlotScope(logger, activity, scope);
+        return new ActivityScope(logger, activity, scope);
     }
 
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
@@ -87,7 +87,7 @@ public sealed class PlotScope
 
     public void Dispose()
     {
-        Last.WhenFirstOnly.With(Story.Buzz).LogWarning(null);
+        Last.WhenFirstOnly.With(Channel.Internal).LogWarning(null);
 
         Activity.Dispose();
         LoggerScope?.Dispose();

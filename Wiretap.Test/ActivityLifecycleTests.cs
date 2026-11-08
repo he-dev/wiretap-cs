@@ -1,11 +1,11 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
-using Wiretap.Util;
+using ActivityEvent = Wiretap.Util.ActivityEvent;
 
 namespace Wiretap.Test;
 
-public class PlotLifecycleTests
+public class ActivityLifecycleTests
 {
     [Theory]
     [InlineData("", "")]
@@ -19,15 +19,15 @@ public class PlotLifecycleTests
     public void LogsExpectedDiagnosticsAndSuppressesCompletedFallback(string events, string expected)
     {
         var logger = new CaptureLogger();
-        using (var plot = logger.BeginPlot("test", Story.Core))
+        using (var activity = logger.BeginScopeAbout("test", Channel.Official))
         {
             foreach (var name in events.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ILogger target = name switch
                 {
-                    "zero" => plot.Zero,
-                    "tick" => plot.Tick,
-                    "last" => plot.Last,
+                    "zero" => activity.Zero,
+                    "tick" => activity.Tick,
+                    "last" => activity.Last,
                     _ => throw new ArgumentException(name)
                 };
                 target.LogInformation("event");
@@ -41,10 +41,10 @@ public class PlotLifecycleTests
     public void FilteredEventsStillAdvanceLifecycle()
     {
         var logger = new CaptureLogger();
-        using (var plot = logger.BeginPlot("filtered", Story.Core))
+        using (var activity = logger.BeginScopeAbout("filtered", Channel.Official))
         {
-            plot.Zero.LogDebug("start");
-            plot.Last.LogDebug("end");
+            activity.Zero.LogDebug("start");
+            activity.Last.LogDebug("end");
         }
 
         Assert.Empty(logger.Diagnostics);
@@ -57,21 +57,21 @@ public class PlotLifecycleTests
     {
         var logger = new CaptureLogger();
         Activity? captured = null;
-        var plot = logger.BeginPlot("status", Story.Core, configure: value => captured = value);
+        var activity = logger.BeginScopeAbout("status", Channel.Official, configure: value => captured = value);
         try
         {
-            plot.Zero.LogInformation("start");
+            activity.Zero.LogInformation("start");
             if (error)
-                plot.Last.LogError("failed");
+                activity.Last.LogError("failed");
             else
-                plot.Last.LogInformation("done");
+                activity.Last.LogInformation("done");
 
             Assert.Equal(expected, captured!.Status);
         }
         finally
         {
             var duration = captured!.Duration;
-            plot.Dispose();
+            activity.Dispose();
             Assert.Equal(duration, captured.Duration);
             Assert.Equal(expected, captured.Status);
         }
@@ -95,7 +95,7 @@ public class PlotLifecycleTests
             var properties = scopes.OfType<IEnumerable<KeyValuePair<string, object?>>>()
                 .SelectMany(properties => properties)
                 .ToArray();
-            if (properties.LastOrDefault(property => property.Key == "plot.event").Value is PlotEvent.Beep)
+            if (properties.LastOrDefault(property => property.Key == "activity.event").Value is ActivityEvent.Beep)
             {
                 Diagnostics.Add((string)properties.Last(property => property.Key == "context.beep_code").Value!);
             }

@@ -5,13 +5,13 @@ using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Util.Logging.Events;
 
-public sealed class LastLogger(PlotScope scope, bool whenFirstOnly = false) : EventLogger(scope, PlotEvent.Last)
+public sealed class LastLogger(ActivityScope scope, bool whenFirstOnly = false) : EventLogger(scope, ActivityEvent.Last)
 {
     public LastLogger WhenFirstOnly => whenFirstOnly ? this : new LastLogger(Scope, whenFirstOnly: true);
 
     protected override (string Name, object? Value)[]? Log(LogLevel logLevel)
     {
-        if (Scope.History.Contains(PlotEvent.Last))
+        if (Scope.History.Contains(ActivityEvent.Last))
         {
             // core: Scope closure does not add another last if one already occurred.
             if (whenFirstOnly)
@@ -19,24 +19,24 @@ public sealed class LastLogger(PlotScope scope, bool whenFirstOnly = false) : Ev
                 return null;
             }
 
-            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Plot {plot.about} logs more than one LAST.");
+            Scope.Beep(LogLevel.Error, "no-events-must-follow-last", "Activity {activity.about} logs more than one LAST.");
 
             // core: A repeated explicit last preserves the first last's duration and status.
             return
             [
-                ("plot.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds)
+                ("activity.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds)
             ];
         }
 
-        // core: Only the first last reports omissions and captures the plot's duration.
-        if (!Scope.History.Contains(PlotEvent.Zero))
+        // core: Only the first last reports omissions and captures the activity's duration.
+        if (!Scope.History.Contains(ActivityEvent.Zero))
         {
-            Scope.Beep(LogLevel.Debug, "does-not-log-zero", "Plot {plot.about} reaches LAST without ZERO.");
+            Scope.Beep(LogLevel.Debug, "does-not-log-zero", "Activity {activity.about} reaches LAST without ZERO.");
         }
 
         if (whenFirstOnly)
         {
-            Scope.Beep(LogLevel.Debug, "logs-last-silently", "Plot {plot.about} ends without an explicit LAST.");
+            Scope.Beep(LogLevel.Debug, "logs-last-silently", "Activity {activity.about} ends without an explicit LAST.");
         }
 
         Scope.Activity.SetEndTime(DateTime.UtcNow);
@@ -59,7 +59,7 @@ public sealed class LastLogger(PlotScope scope, bool whenFirstOnly = false) : Ev
 
         return
         [
-            ("plot.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds)
+            ("activity.duration_ms", (long)Scope.Activity.Duration.TotalMilliseconds)
         ];
     }
 }

@@ -34,10 +34,10 @@ using (var services = app.Services.CreateScope())
     var loggerFactory = services.ServiceProvider.GetRequiredService<ILoggerFactory>();
     var loopCount = 1;
 
-    using (var scope = logger.BeginPlot("example", Story.Core, [("loopCount", loopCount)]))
+    using (var scope = logger.BeginScopeAbout("example", Channel.Official, [("loopCount", loopCount)]))
     {
-        scope.Zero.With(Story.Buzz).LogInformation("Hello Wiretap!");
-        scope.Zero.With(Story.Buzz).LogInformation("One ZERO to many!");
+        scope.Zero.With(Channel.Internal).LogInformation("Hello Wiretap!");
+        scope.Zero.With(Channel.Internal).LogInformation("One ZERO to many!");
 
         var stats = new Benchmark();
         foreach (var found in new[] { true, false, true })
@@ -48,7 +48,7 @@ using (var services = app.Services.CreateScope())
             sample.CountAs(found ? "found" : "not-found");
         }
 
-        scope.Tick.With(Story.Buzz).LogInformation(
+        scope.Tick.With(Channel.Internal).LogInformation(
             "Processed {FilesTotal} files at {FilesPerSecond:F2}/s; found {FilesFound}, not found {FilesNotFound}, found rate {FoundRate:P0}.",
             stats.Total.Count,
             stats.Total.ThroughputMs * 1000,
@@ -57,7 +57,7 @@ using (var services = app.Services.CreateScope())
             stats.Ratio("found"));
     }
 
-    logger.Snap("DoesEnd", Story.Buzz).LogInformation(null);
+    logger.Snap("DoesEnd", Channel.Internal).LogInformation(null);
 }
 
 //app.MapGet("/", () => "Hello Wiretap!");

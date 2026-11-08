@@ -12,9 +12,9 @@ public static class LoggerExtensions
 {
     extension(ILogger logger)
     {
-        public SnapLogger Snap(string about, Story story)
+        public SnapLogger Snap(string about, Channel channel)
         {
-            return new SnapLogger(logger, about, story);
+            return new SnapLogger(logger, about, channel);
         }
 
         public PropertyLogger With(params (string Name, object? Value)[] properties)
@@ -27,28 +27,28 @@ public static class LoggerExtensions
             return PropertyScope.With(logger, properties);
         }
 
-        public PlotScope BeginPlot
+        public ActivityScope BeginScopeAbout
         (
             string about,
-            Story story,
+            Channel channel,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return PlotScope.About(logger, about, story, properties, configure);
+            return ActivityScope.About(logger, about, channel, properties, configure);
         }
 
-        public PlotScope BeginPlot<TAbout>
+        public ActivityScope BeginScopeAbout<TAbout>
         (
-            Story story,
+            Channel channel,
             (string Name, object? Value)[]? properties = null,
             Action<Activity>? configure = null
         )
         {
-            return logger.BeginPlot(typeof(TAbout).Name, story, properties, configure);
+            return logger.BeginScopeAbout(typeof(TAbout).Name, channel, properties, configure);
         }
 
-        public IDisposable ContinuePlot
+        public IDisposable ContinueScopeAbout
         (
             string about,
             string traceId,

@@ -5,7 +5,7 @@ using Wiretap.Core;
 
 namespace Wiretap.Util.Logging.Events;
 
-public sealed class SnapLogger(ILogger logger, string about, Story story) : ILogger
+public sealed class SnapLogger(ILogger logger, string about, Channel channel) : ILogger
 {
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => logger.BeginScope(state);
 
@@ -21,9 +21,9 @@ public sealed class SnapLogger(ILogger logger, string about, Story story) : ILog
             logger
                 .With
                 (
-                    ("plot.about", about),
-                    ("plot.event", PlotEvent.Snap),
-                    ("plot.story", story.Value),
+                    ("activity.about", about),
+                    ("activity.event", ActivityEvent.Snap),
+                    ("activity.channel", channel.Value),
                     ("trace.id", activity?.TraceId.ToHexString()),
                     ("trace.span_id", activity?.SpanId.ToHexString()),
                     ("trace.parent_id", parentId)
