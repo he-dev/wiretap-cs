@@ -1,4 +1,4 @@
-﻿namespace Wiretap.Util;
+﻿namespace Wiretap.Data;
 
 public enum ActivityEvent
 {

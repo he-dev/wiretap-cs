@@ -22,10 +22,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="src\Meta\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Wiretap\Wiretap.csproj" />
   </ItemGroup>
 

@@ -1,7 +1,8 @@
 using System;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
-using Wiretap.Util.Logging.Scopes;
+using Wiretap.Core.Scopes;
+using Wiretap.Data;
 
 namespace Wiretap.Util.Logging;
 

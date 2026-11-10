@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using Wiretap.Util.Logging.Scopes;
+using Wiretap.Core.Scopes;
+using Wiretap.Data;
+using Wiretap.Util.Logging;
 
-namespace Wiretap.Util.Logging.Events;
+namespace Wiretap.Core.Events;
 
 public sealed class ZeroLogger(ActivityScope scope) : EventLogger(scope, ActivityEvent.Zero)
 {

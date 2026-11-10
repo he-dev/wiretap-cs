@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
-namespace Wiretap.Util.Logging.Scopes;
+namespace Wiretap.Core.Scopes;
 
 public class PropertyScope(ILogger logger, KeyValuePair<string, object?>[] properties) : ILogger, IDisposable
 {

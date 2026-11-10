@@ -1,9 +1,11 @@
 using System;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Wiretap.Util.Logging.Scopes;
+using Wiretap.Core.Scopes;
+using Wiretap.Util.Logging;
+using ActivityEvent = Wiretap.Data.ActivityEvent;
 
-namespace Wiretap.Util.Logging.Events;
+namespace Wiretap.Core.Events;
 
 public sealed class LastLogger(ActivityScope scope, bool whenFirstOnly = false) : EventLogger(scope, ActivityEvent.Last)
 {

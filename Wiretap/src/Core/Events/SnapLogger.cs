@@ -1,9 +1,8 @@
 using System;
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
-using Wiretap.Core;
+using Wiretap.Data;
 
-namespace Wiretap.Util.Logging.Events;
+namespace Wiretap.Core.Events;
 
 public sealed class SnapLogger(ILogger logger, string about) : ILogger
 {
@@ -15,7 +14,7 @@ public sealed class SnapLogger(ILogger logger, string about) : ILogger
     {
         if (IsEnabled(logLevel))
         {
-            var activity = Activity.Current;
+            var activity = System.Diagnostics.Activity.Current;
             var parentId = activity is null || activity.ParentSpanId == default ? null : activity.ParentSpanId.ToHexString();
 
             logger

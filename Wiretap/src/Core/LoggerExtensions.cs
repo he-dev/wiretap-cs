@@ -2,10 +2,11 @@
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using Wiretap.Core.Events;
+using Wiretap.Core.Scopes;
+using Wiretap.Data;
 using Wiretap.Util;
 using Wiretap.Util.Logging;
-using Wiretap.Util.Logging.Events;
-using Wiretap.Util.Logging.Scopes;
 
 namespace Wiretap.Core;
 
@@ -25,9 +26,11 @@ public static class LoggerExtensions
             return PropertyLogger.With(logger, properties);
         }
 
-        public PropertyLogger Official => logger.With(("activity.channel", "official"));
+        public PropertyLogger Baseline => logger.With(Content.Baseline);
 
-        public PropertyLogger Internal => logger.With(("activity.channel", "internal"));
+        public PropertyLogger Internal => logger.With(Content.Internal);
+
+        public PropertyLogger Metadata => logger.With(Content.Metadata);
 
         public PropertyScope BeginScopeWith(params (string Name, object? Value)[] properties)
         {

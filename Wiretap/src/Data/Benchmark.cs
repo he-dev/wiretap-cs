@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 
-namespace Wiretap.Core.Data;
+namespace Wiretap.Data;
 
 /// <summary>Measures samples overall and by a single optional outcome label.</summary>
 public sealed class Benchmark

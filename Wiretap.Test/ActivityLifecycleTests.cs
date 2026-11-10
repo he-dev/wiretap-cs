@@ -2,7 +2,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Wiretap.Core;
 using Wiretap.Util;
-using ActivityEvent = Wiretap.Util.ActivityEvent;
+using ActivityEvent = Wiretap.Data.ActivityEvent;
 
 namespace Wiretap.Test;
 

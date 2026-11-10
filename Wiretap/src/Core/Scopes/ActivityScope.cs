@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Wiretap.Core;
-using Wiretap.Util.Logging.Events;
+using Wiretap.Core.Events;
+using Wiretap.Data;
 
-namespace Wiretap.Util.Logging.Scopes;
+namespace Wiretap.Core.Scopes;
 
 public sealed class ActivityScope
 (
     ILogger logger,
-    Activity activity,
+    System.Diagnostics.Activity activity,
     IDisposable? loggerScope
 ) : ILogger, IDisposable
 {
@@ -19,7 +18,7 @@ public sealed class ActivityScope
     public TickLogger Tick => new TickLogger(this);
     public LastLogger Last => new LastLogger(this);
 
-    internal Activity Activity { get; } = activity;
+    internal System.Diagnostics.Activity Activity { get; } = activity;
     internal List<ActivityEvent> History { get; } = [];
 
     private IDisposable? LoggerScope { get; } = loggerScope;
@@ -46,10 +45,10 @@ public sealed class ActivityScope
         ILogger logger,
         string about,
         (string Name, object? Value)[]? properties = null,
-        Action<Activity>? configure = null
+        Action<System.Diagnostics.Activity>? configure = null
     )
     {
-        var activity = new Activity(about);
+        var activity = new System.Diagnostics.Activity(about);
         configure?.Invoke(activity);
         activity.Start();
 
